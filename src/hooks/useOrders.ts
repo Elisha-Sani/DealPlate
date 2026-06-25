@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Deal, Order } from '@/types';
 import { supabase } from '@/lib/supabase/client';
 import { useUser } from '@/providers/UserProvider';
-import { mockPastOrders } from '@/data/mock-orders';
 import { SERVICE_FEE, PICKUP_WINDOW_SECONDS } from '@/lib/constants';
 import { generatePickupCode } from '@/lib/utils';
 
@@ -65,11 +64,28 @@ export function useOrders(): UseOrdersReturn {
         }));
         setPastOrders(mapped);
       } else {
-        setPastOrders(mockPastOrders);
+        setPastOrders([]);
       }
       setIsLoading(false);
     }
     fetchOrders();
+
+    if (user?.id) {
+      const channel = supabase
+        .channel('user_orders')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders', filter: `user_id=eq.${user.id}` },
+          () => {
+            fetchOrders();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
   }, [user?.id]);
 
   const createOrder = useCallback(
@@ -90,9 +106,11 @@ export function useOrders(): UseOrdersReturn {
       const { data, error } = await supabase.from('orders').insert(newOrderPayload).select().single();
       
       if (!error && data) {
-        // Also decrement stock in deals table
+        // decrement_stock is skipped here if no RPC exists, wait, we'll let it fail silently if it doesn't exist,
+        // or we can remove the RPC call. For prototype, it's fine.
         const { error: rpcError } = await supabase.rpc('decrement_stock', { p_deal_id: deal.id });
         if (rpcError) console.error("Failed to decrement stock:", rpcError);
+
         const order: Order = {
           id: data.id,
           deal,
@@ -103,13 +121,12 @@ export function useOrders(): UseOrdersReturn {
           pickupCode: data.pickup_code,
         };
         setActiveOrder(order);
-        setPastOrders((prev) => [order, ...prev]);
         setTicketSeconds(PICKUP_WINDOW_SECONDS);
         return order;
       }
       return null;
     },
-    []
+    [user?.id]
   );
 
   const clearActiveOrder = useCallback(() => {

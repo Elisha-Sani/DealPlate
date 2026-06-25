@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Deal } from '@/types';
 import { supabase } from '@/lib/supabase/client';
-import { mockDeals } from '@/data/mock-deals';
 import { mapSupabaseDeal } from '@/lib/utils';
 
 interface UseDealsReturn {
@@ -29,20 +28,30 @@ export function useDeals(): UseDealsReturn {
         const { data, error } = await supabase.from('deals').select('*');
         if (error) {
           console.error('Error fetching deals:', error);
-          setDeals(mockDeals);
-        } else if (data && data.length > 0) {
+          setDeals([]);
+        } else if (data) {
           setDeals(data.map(mapSupabaseDeal));
-        } else {
-          setDeals(mockDeals);
         }
       } catch (err) {
         console.error(err);
-        setDeals(mockDeals);
+        setDeals([]);
       } finally {
         setIsLoading(false);
       }
     };
+
     fetchDeals();
+
+    const channel = supabase
+      .channel('deals_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchDeals();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const filteredDeals = useMemo(() => {

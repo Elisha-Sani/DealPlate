@@ -4,10 +4,33 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Store, Eye, EyeOff, Lock, Mail, HelpCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabase/client';
 
 export default function VendorSignIn() {
   const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setIsLoading(false);
+    } else {
+      router.push('/vendor/dashboard');
+    }
+  };
 
   return (
     <motion.div
@@ -34,12 +57,24 @@ export default function VendorSignIn() {
             <p>Note: Only verified vendor accounts can access the management dashboard.</p>
           </div>
 
-          <form onSubmit={(e) => { e.preventDefault(); router.push('/vendor/dashboard'); }} className="space-y-5">
+          <form onSubmit={handleSignIn} className="space-y-5">
+            {error && (
+              <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-100">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Business Email</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type="email" placeholder="vendor@example.com" required className="w-full h-11 pl-11 pr-4 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="vendor@demo.com"
+                  required
+                  className="w-full h-11 pl-11 pr-4 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all"
+                />
               </div>
             </div>
             <div>
@@ -49,8 +84,19 @@ export default function VendorSignIn() {
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input type={showPassword ? 'text' : 'password'} placeholder="••••••••" required className="w-full h-11 pl-11 pr-11 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all" />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#1E293B]">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full h-11 pl-11 pr-11 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#1E293B]"
+                >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
@@ -59,8 +105,16 @@ export default function VendorSignIn() {
               <input type="checkbox" id="remember" className="rounded text-[#FF6B00] focus:ring-[#FF6B00]" />
               <label htmlFor="remember" className="text-sm text-gray-600">Remember my device for 30 days</label>
             </div>
-            <button type="submit" className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all mt-4">
-              Access Dashboard &rarr;
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all mt-4 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <span>Access Dashboard &rarr;</span>
+              )}
             </button>
           </form>
 

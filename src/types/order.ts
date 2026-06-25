@@ -11,4 +11,9 @@ export interface Order {
   totalPaid: number;
   pickupCode?: string;
   pickupDeadline?: string;
+  student?: {
+    full_name: string;
+    phone: string;
+    university: string;
+  };
 }

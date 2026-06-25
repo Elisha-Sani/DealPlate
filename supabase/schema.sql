@@ -5,14 +5,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- 1. VENDORS TABLE
 -- ============================================================
 CREATE TABLE vendors (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     business_name TEXT NOT NULL,
     contact_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     phone TEXT NOT NULL,
     address TEXT NOT NULL,
     campus_proximity TEXT NOT NULL,
-    status TEXT DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'approved', 'suspended')),
+    status TEXT DEFAULT 'approved' CHECK (status IN ('pending_review', 'approved', 'suspended')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -37,7 +37,7 @@ CREATE TABLE student_profiles (
 -- ============================================================
 CREATE TABLE deals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    vendor_id UUID REFERENCES vendors(id) ON DELETE SET NULL,
+    vendor_id UUID REFERENCES vendors(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     vendor TEXT NOT NULL,                -- display name (denormalized for speed)
     campus TEXT NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE deals (
 -- ============================================================
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    user_id UUID REFERENCES student_profiles(id) ON DELETE CASCADE,
     deal_id UUID REFERENCES deals(id) ON DELETE CASCADE,
     order_date TEXT NOT NULL,
     order_time TEXT NOT NULL,
@@ -74,8 +74,14 @@ CREATE TABLE orders (
 );
 
 -- ============================================================
--- 5. ROW LEVEL SECURITY (RLS)
+-- 5. REALTIME & RLS
 -- ============================================================
+
+-- Enable Realtime
+DROP PUBLICATION IF EXISTS supabase_realtime;
+CREATE PUBLICATION supabase_realtime;
+ALTER PUBLICATION supabase_realtime ADD TABLE deals, orders, student_profiles, vendors;
+
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE student_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
@@ -86,33 +92,42 @@ ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 -- ============================================================
 
 -- DEALS: Anyone can view deals (public feed)
-CREATE POLICY "Deals are viewable by everyone" ON deals
-    FOR SELECT USING (true);
+CREATE POLICY "Deals are viewable by everyone" ON deals FOR SELECT USING (true);
 
 -- DEALS: Only the owning vendor can insert/update their deals
 CREATE POLICY "Vendors can manage their own deals" ON deals
     FOR ALL
-    USING (vendor_id IN (SELECT id FROM vendors WHERE email = auth.jwt() ->> 'email'))
-    WITH CHECK (vendor_id IN (SELECT id FROM vendors WHERE email = auth.jwt() ->> 'email'));
+    USING (vendor_id = auth.uid())
+    WITH CHECK (vendor_id = auth.uid());
 
--- ORDERS: Users can only see their own orders
+-- ORDERS: Users can only see their own orders, Vendors can see orders for their deals
 CREATE POLICY "Users can view their own orders" ON orders
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (
+        auth.uid() = user_id OR 
+        deal_id IN (SELECT id FROM deals WHERE vendor_id = auth.uid())
+    );
 
--- ORDERS: Users can insert their own orders
+-- ORDERS: Students can insert their own orders
 CREATE POLICY "Users can insert their own orders" ON orders
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- STUDENT PROFILES: Users can only read/write their own profile
+-- ORDERS: Vendors can update orders for their deals (e.g. marking Complete)
+CREATE POLICY "Vendors can update orders for their deals" ON orders
+    FOR UPDATE USING (
+        deal_id IN (SELECT id FROM deals WHERE vendor_id = auth.uid())
+    ) WITH CHECK (
+        deal_id IN (SELECT id FROM deals WHERE vendor_id = auth.uid())
+    );
+
+-- STUDENT PROFILES: Public read (or authenticated read), restricted write
+CREATE POLICY "Student profiles viewable by authenticated users" ON student_profiles
+    FOR SELECT USING (auth.role() = 'authenticated');
+
 CREATE POLICY "Users can manage their own profile" ON student_profiles
-    FOR ALL
-    USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id);
+    FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
 -- VENDORS: Public read for listing, restricted write
-CREATE POLICY "Vendors are viewable by everyone" ON vendors
-    FOR SELECT USING (true);
+CREATE POLICY "Vendors are viewable by everyone" ON vendors FOR SELECT USING (true);
 
 CREATE POLICY "Vendors can update their own profile" ON vendors
-    FOR UPDATE USING (email = auth.jwt() ->> 'email')
-    WITH CHECK (email = auth.jwt() ->> 'email');
+    FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);

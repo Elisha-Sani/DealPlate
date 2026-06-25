@@ -1,18 +1,82 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutDashboard, Loader2 } from 'lucide-react';
 import VendorTopBar from '@/components/layout/VendorTopBar';
 import OrderQueueTable from '@/components/vendor/OrderQueueTable';
-import type { VendorOrder } from '@/types';
+import { supabase } from '@/lib/supabase/client';
+import type { Order, Deal } from '@/types';
+import { useRouter } from 'next/navigation';
 
 export default function VendorOrders() {
-  const [orders] = useState<VendorOrder[]>([
-    { id: '#ORD-9921', studentName: 'James Kamau', studentPhone: '+254 712 345678', institution: 'UoN Main', mpesaRef: 'QWE123RTY4', status: 'Awaiting Pickup', dealTitle: 'Lunch Surplus Bag' },
-    { id: '#ORD-9920', studentName: 'Sarah Ochieng', studentPhone: '+254 722 987654', institution: 'Strathmore', mpesaRef: 'ASD987FGH6', status: 'Collected', dealTitle: 'Morning Pastries' },
-    { id: '#ORD-9919', studentName: 'Brian Mutua', studentPhone: '+254 733 112233', institution: 'KU Ruiru', mpesaRef: 'ZXC456VBN7', status: 'Awaiting Pickup', dealTitle: 'Slice Combo' },
-  ]);
+  const router = useRouter();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      router.push('/vendor/sign-in');
+      return;
+    }
+
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select(`*, deal:deals(*), student:user_id(*)`)
+      .order('created_at', { ascending: false });
+
+    if (ordersData) {
+      const mappedOrders: Order[] = ordersData.filter(o => o.deal).map(o => ({
+        id: o.id,
+        deal: {
+          id: o.deal.id,
+          title: o.deal.title,
+          vendor: o.deal.vendor,
+          campus: o.deal.campus,
+          originalPrice: Number(o.deal.original_price),
+          dealPrice: Number(o.deal.deal_price),
+          image: o.deal.image,
+          discountPercentage: o.deal.discount_percentage,
+          timeStart: o.deal.time_start,
+          timeEnd: o.deal.time_end,
+          category: o.deal.category,
+          stockCount: o.deal.stock_count,
+          durationRemaining: o.deal.duration_remaining
+        } as Deal,
+        student: o.student ? {
+          full_name: o.student.full_name,
+          phone: o.student.phone,
+          university: o.student.university,
+        } : undefined,
+        date: o.order_date,
+        time: o.order_time,
+        status: o.status as any,
+        totalPaid: Number(o.total_paid),
+        pickupCode: o.pickup_code,
+        pickupDeadline: o.pickup_deadline
+      }));
+      setOrders(mappedOrders);
+    }
+    setIsLoading(false);
+  }, [router]);
+
+  useEffect(() => {
+    fetchOrders();
+
+    const ordersChannel = supabase
+      .channel('vendor_orders_page')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [fetchOrders]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col flex-1">
@@ -25,12 +89,22 @@ export default function VendorOrders() {
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
               Live Sync Active
             </div>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <button 
+              onClick={fetchOrders}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
               <LayoutDashboard className="w-4 h-4" /> Refresh
             </button>
           </div>
         </div>
-        <OrderQueueTable orders={orders} />
+        
+        {isLoading ? (
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-8 h-8 text-[#FF6B00] animate-spin" />
+          </div>
+        ) : (
+          <OrderQueueTable orders={orders} />
+        )}
       </div>
     </motion.div>
   );

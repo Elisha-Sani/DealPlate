@@ -72,7 +72,7 @@ export default function StudentProfile() {
           </div>
           <div>
             <span className="block text-xs font-black text-[#5a4136] uppercase tracking-wider mb-1">Total Savings</span>
-            <Price amount={user.totalSaved} size="lg" className="text-[#FF6B00]" />
+            <Price amount={pastOrders.filter(o => o.status === 'Completed').reduce((sum, o) => sum + (o.deal.originalPrice - o.deal.dealPrice), 0)} size="lg" className="text-[#FF6B00]" />
           </div>
         </div>
         <div className="bg-white border border-[#F3F4F6] rounded-xl p-5 shadow-sm flex flex-col justify-between items-start hover:shadow transition-shadow">
@@ -81,7 +81,7 @@ export default function StudentProfile() {
           </div>
           <div>
             <span className="block text-xs font-black text-[#5a4136] uppercase tracking-wider mb-1">Meals Enjoyed</span>
-            <span className="text-2xl font-extrabold tracking-tight text-[#111827]">{user.mealsEnjoyed} meals</span>
+            <span className="text-2xl font-extrabold tracking-tight text-[#111827]">{pastOrders.filter(o => o.status === 'Completed').length} meals</span>
           </div>
         </div>
       </section>

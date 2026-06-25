@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase/client';
 import VendorTopBar from '@/components/layout/VendorTopBar';
@@ -10,8 +10,10 @@ import LiveFeed from '@/components/vendor/LiveFeed';
 import RevenueChart from '@/components/vendor/RevenueChart';
 import type { Deal, Order } from '@/types';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function VendorDashboard() {
+  const router = useRouter();
   const [vendorName, setVendorName] = useState('Loading...');
   const [deals, setDeals] = useState<Deal[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -22,88 +24,129 @@ export default function VendorDashboard() {
   const [activeBags, setActiveBags] = useState(0);
   const [pendingPickups, setPendingPickups] = useState(0);
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      // 1. Get Vendor
-      const { data: vendorData } = await supabase
-        .from('vendors')
-        .select('id, business_name')
-        .limit(1)
-        .single();
-
-      if (!vendorData) {
-        setVendorName('Vendor Not Found');
-        setLoading(false);
-        return;
-      }
-      setVendorName(vendorData.business_name);
-
-      // 2. Get Deals
-      const { data: dealsData } = await supabase
-        .from('deals')
-        .select('*')
-        .eq('vendor_id', vendorData.id)
-        .order('created_at', { ascending: false });
-
-      let mappedDeals: Deal[] = [];
-      if (dealsData) {
-        mappedDeals = dealsData.map(d => ({
-          id: d.id,
-          title: d.title,
-          vendor: d.vendor,
-          campus: d.campus,
-          originalPrice: d.original_price,
-          dealPrice: d.deal_price,
-          image: d.image,
-          discountPercentage: d.discount_percentage,
-          timeStart: d.time_start,
-          timeEnd: d.time_end,
-          category: d.category,
-          tags: [],
-          description: d.description,
-          stockCount: d.stock_count,
-          durationRemaining: d.duration_remaining
-        }));
-        setDeals(mappedDeals);
-        
-        // Calculate Active Bags
-        setActiveBags(mappedDeals.reduce((sum, d) => sum + d.stockCount, 0));
-      }
-
-      // 3. Get Orders (for those deals)
-      if (dealsData && dealsData.length > 0) {
-        const dealIds = dealsData.map(d => d.id);
-        const { data: ordersData } = await supabase
-          .from('orders')
-          .select(`*, deal:deals(*)`)
-          .in('deal_id', dealIds)
-          .order('created_at', { ascending: false });
-
-        if (ordersData) {
-          const mappedOrders: Order[] = ordersData.map(o => ({
-            id: o.id,
-            deal: o.deal as any,
-            date: o.order_date,
-            time: o.order_time,
-            status: o.status as any,
-            totalPaid: Number(o.total_paid),
-            pickupCode: o.pickup_code,
-            pickupDeadline: o.pickup_deadline
-          }));
-          setOrders(mappedOrders);
-
-          // Calculate Revenue
-          setRevenue(mappedOrders.reduce((sum, o) => sum + o.totalPaid, 0));
-          // Calculate Pending Pickups
-          setPendingPickups(mappedOrders.filter(o => o.status === 'Active').length);
-        }
-      }
-
-      setLoading(false);
+  const fetchDashboardData = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) {
+      router.push('/vendor/sign-in');
+      return;
     }
 
+    // 1. Get Vendor Profile
+    const { data: vendorData } = await supabase
+      .from('vendors')
+      .select('id, business_name')
+      .eq('id', session.user.id)
+      .single();
+
+    if (!vendorData) {
+      setVendorName('Vendor Profile Not Found');
+      setLoading(false);
+      return;
+    }
+    setVendorName(vendorData.business_name);
+
+    // 2. Get Deals
+    const { data: dealsData } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('vendor_id', vendorData.id)
+      .order('created_at', { ascending: false });
+
+    let mappedDeals: Deal[] = [];
+    if (dealsData) {
+      mappedDeals = dealsData.map(d => ({
+        id: d.id,
+        title: d.title,
+        vendor: d.vendor,
+        campus: d.campus,
+        originalPrice: Number(d.original_price),
+        dealPrice: Number(d.deal_price),
+        image: d.image,
+        discountPercentage: d.discount_percentage,
+        timeStart: d.time_start,
+        timeEnd: d.time_end,
+        category: d.category,
+        tags: d.tags || [],
+        description: d.description,
+        stockCount: d.stock_count,
+        durationRemaining: d.duration_remaining
+      }));
+      setDeals(mappedDeals);
+      setActiveBags(mappedDeals.reduce((sum, d) => sum + d.stockCount, 0));
+    }
+
+    // 3. Get Orders
+    const { data: ordersData } = await supabase
+      .from('orders')
+      .select(`*, deal:deals(*), student:user_id(*)`)
+      .order('created_at', { ascending: false });
+
+    if (ordersData) {
+      // The RLS policy "Vendors can view orders for their deals" filters this automatically, 
+      // but we ensure we only process valid ones.
+      const mappedOrders: Order[] = ordersData.filter(o => o.deal).map(o => ({
+        id: o.id,
+        deal: {
+          id: o.deal.id,
+          title: o.deal.title,
+          vendor: o.deal.vendor,
+          campus: o.deal.campus,
+          originalPrice: Number(o.deal.original_price),
+          dealPrice: Number(o.deal.deal_price),
+          image: o.deal.image,
+          discountPercentage: o.deal.discount_percentage,
+          timeStart: o.deal.time_start,
+          timeEnd: o.deal.time_end,
+          category: o.deal.category,
+          stockCount: o.deal.stock_count,
+          durationRemaining: o.deal.duration_remaining
+        } as Deal,
+        student: o.student ? {
+          full_name: o.student.full_name,
+          phone: o.student.phone,
+          university: o.student.university,
+        } : undefined,
+        date: o.order_date,
+        time: o.order_time,
+        status: o.status as any,
+        totalPaid: Number(o.total_paid),
+        pickupCode: o.pickup_code,
+        pickupDeadline: o.pickup_deadline
+      }));
+      
+      setOrders(mappedOrders);
+      setRevenue(mappedOrders.reduce((sum, o) => sum + o.totalPaid, 0));
+      setPendingPickups(mappedOrders.filter(o => o.status === 'Active').length);
+    }
+
+    setLoading(false);
+  }, [router]);
+
+  useEffect(() => {
     fetchDashboardData();
-  }, []);
+
+    // Subscribe to deal changes
+    const dealsChannel = supabase
+      .channel('vendor_deals')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
+    // Subscribe to order changes
+    const ordersChannel = supabase
+      .channel('vendor_orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchDashboardData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(dealsChannel);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [fetchDashboardData]);
 
   if (loading) {
     return (

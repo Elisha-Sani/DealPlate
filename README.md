@@ -45,24 +45,40 @@ By matching excess high-quality food with hungry students, DealPlate actively fi
    cd DealPlate
    ```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+# DealPlate - Prototype
 
-3. **Configure Environment Variables:**
-   Rename `.env.example` to `.env.local` (or create one) and populate the following keys:
+DealPlate is a modern, dynamic web application designed to connect university students with local food vendors to rescue high-quality surplus meals at significant discounts.
+
+## Tech Stack
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS, Framer Motion
+- **Backend/Database:** Supabase (PostgreSQL, Auth, Realtime)
+- **Deployment:** Vercel (Recommended)
+
+## Demo Credentials
+We have seeded the database with demo accounts for testing both sides of the marketplace:
+
+**Student Account:**
+- **Email:** student@demo.com
+- **Password:** demo@_123
+
+**Vendor Account:**
+- **Email:** vendor@demo.com
+- **Password:** demo@_123
+
+## Setup Instructions
+1. Install dependencies: `npm install`
+2. Create a `.env.local` file with your Supabase credentials:
    ```env
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
-   GEMINI_API_KEY=your_gemini_api_key
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
+3. Run the development server: `npm run dev`
+4. Access the app at `http://localhost:3000`
 
-4. **Initialize the Database:**
-   Run the SQL scripts located in the `supabase/` directory in your Supabase SQL Editor to generate the schema and seed mock data.
-
-5. **Run the Development Server:**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) in your browser.
+## Features Implemented
+- Live Realtime Deal Feed for Students
+- Live Order Syncing & Dashboard Analytics for Vendors
+- Supabase Authentication Integration
+- Secure RLS (Row Level Security) Database Policies
+- Interactive, responsive, and dynamic UI using Framer Motion

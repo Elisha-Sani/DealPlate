@@ -25,13 +25,10 @@ export function formatTime(totalSeconds: number): string {
 }
 
 /**
- * Generate a random pickup code like "DP-A3X9K".
+ * Generate a random 6-digit numeric pickup code.
  */
 export function generatePickupCode(): string {
-  return `DP-${Math.floor(100000 + Math.random() * 900000)
-    .toString(36)
-    .toUpperCase()
-    .substring(0, 5)}`;
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 /**

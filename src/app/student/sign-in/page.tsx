@@ -4,28 +4,32 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
-import { useUser } from '@/providers/UserProvider';
-import { DEFAULT_AVATAR } from '@/lib/constants';
+import { supabase } from '@/lib/supabase/client';
 
 export default function StudentSignIn() {
   const router = useRouter();
-  const { login } = useUser();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    login({
-      fullName: 'Alex Mercer',
-      phone: '+254 712 345 678',
-      email: 'alex.mercer@student.uonbi.ac.ke',
-      university: 'Technical University of Kenya',
-      regNumber: 'SCCI/00586/2020',
-      isVerified: true,
-      avatar: DEFAULT_AVATAR,
-      totalSaved: 4500,
-      mealsEnjoyed: 12,
+    setIsLoading(true);
+    setError(null);
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
-    router.push('/student/explore');
+
+    if (error) {
+      setError(error.message);
+      setIsLoading(false);
+    } else {
+      router.push('/student/explore');
+    }
   };
 
   return (
@@ -47,14 +51,21 @@ export default function StudentSignIn() {
       </div>
 
       <form onSubmit={handleSignIn} className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md space-y-5">
+        {error && (
+          <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm font-medium border border-red-100">
+            {error}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-2 ml-2">
-            Phone Number or Email
+            Email Address
           </label>
           <input
-            type="text"
+            type="email"
             required
-            placeholder="student@university.edu or +254..."
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="student@demo.com"
             className="w-full h-12 rounded-lg border border-gray-200 bg-white px-4 text-sm focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none transition-all"
           />
         </div>
@@ -72,6 +83,8 @@ export default function StudentSignIn() {
             <input
               type={showPassword ? 'text' : 'password'}
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full h-12 rounded-lg border border-gray-200 bg-white pl-4 pr-11 text-sm focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none transition-all"
             />
@@ -87,10 +100,17 @@ export default function StudentSignIn() {
 
         <button
           type="submit"
-          className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 mt-2"
+          disabled={isLoading}
+          className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 mt-2 disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <Lock className="w-4 h-4" />
-          <span>Secure Login</span>
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <>
+              <Lock className="w-4 h-4" />
+              <span>Secure Login</span>
+            </>
+          )}
         </button>
       </form>
 

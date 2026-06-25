@@ -63,7 +63,7 @@ export default function RevenueChart({ todayRevenue }: RevenueChartProps) {
             <Tooltip
               contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
               itemStyle={{ color: '#FF6B00', fontWeight: 'bold' }}
-              formatter={(value: number | string | ReadonlyArray<number | string> | undefined) => [`Ksh ${Number(value || 0).toLocaleString()}`, 'Revenue']}
+              formatter={(value: number | string | readonly (number | string)[] | undefined) => [`Ksh ${Number(value || 0).toLocaleString()}`, 'Revenue']}
             />
             <Area 
               type="monotone" 

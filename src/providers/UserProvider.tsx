@@ -5,23 +5,9 @@ import type { User } from '@/types';
 import { DEFAULT_AVATAR } from '@/lib/constants';
 import { supabase } from '@/lib/supabase/client';
 
-// Default mock user fallback (without fixed ID)
-const defaultUser: User = {
-  id: '',
-  fullName: 'Alex Mercer',
-  phone: '+254 712 345 678',
-  email: 'alex.mercer@student.uonbi.ac.ke',
-  university: 'Technical University of Kenya',
-  regNumber: 'SCCI/00586/2020',
-  isVerified: true,
-  avatar: DEFAULT_AVATAR,
-  totalSaved: 4500,
-  mealsEnjoyed: 12,
-};
-
 interface UserContextType {
-  user: User;
-  setUser: React.Dispatch<React.SetStateAction<User>>;
+  user: User | null;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
   isAuthenticated: boolean;
   login: (userData?: Partial<User>) => void;
   logout: () => void;
@@ -31,51 +17,76 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | null>(null);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(defaultUser);
+  const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch real mock user from Supabase if available
   useEffect(() => {
-    async function loadMockUser() {
-      const { data, error } = await supabase
-        .from('student_profiles')
-        .select('*')
-        .limit(1)
-        .single();
-        
-      if (data && !error) {
-        setUser({
-          id: data.id,
-          fullName: data.full_name,
-          phone: data.phone,
-          email: 'alex.mercer@student.uonbi.ac.ke', // Mock fallback since email is in auth
-          university: data.university,
-          regNumber: data.reg_number,
-          isVerified: data.is_verified,
-          avatar: data.id_photo_url || DEFAULT_AVATAR,
-          totalSaved: data.total_saved,
-          mealsEnjoyed: data.meals_enjoyed,
-        });
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchStudentProfile(session.user.id, session.user.email || '');
       }
-    }
-    loadMockUser();
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchStudentProfile(session.user.id, session.user.email || '');
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const fetchStudentProfile = async (userId: string, email: string) => {
+    const { data, error } = await supabase
+      .from('student_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (data && !error) {
+      setUser({
+        id: data.id,
+        fullName: data.full_name,
+        phone: data.phone,
+        email: email,
+        university: data.university,
+        regNumber: data.reg_number,
+        isVerified: data.is_verified,
+        avatar: data.id_photo_url || DEFAULT_AVATAR,
+        totalSaved: Number(data.total_saved),
+        mealsEnjoyed: Number(data.meals_enjoyed),
+      });
+      setIsAuthenticated(true);
+    }
+  };
 
   const login = useCallback((userData?: Partial<User>) => {
-    setUser((prev) => ({ ...prev, ...userData }));
+    // Used for optimistic updates if needed
+    if (user) {
+      setUser({ ...user, ...userData });
+    }
     setIsAuthenticated(true);
-  }, []);
+  }, [user]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
     setIsAuthenticated(false);
   }, []);
 
   const updateStats = useCallback((savedAmount: number) => {
-    setUser((prev) => ({
+    setUser((prev) => prev ? ({
       ...prev,
       mealsEnjoyed: prev.mealsEnjoyed + 1,
       totalSaved: prev.totalSaved + savedAmount,
-    }));
+    }) : null);
   }, []);
 
   return (
