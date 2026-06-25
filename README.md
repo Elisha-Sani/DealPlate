@@ -1,19 +1,68 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <h1>🍽️ DealPlate</h1>
+  <p><strong>Connecting Campus Vendors with Students to Eliminate Food Waste</strong></p>
 </div>
 
-# Run and deploy your AI Studio app
+## Overview
 
-This contains everything you need to run your app locally.
-https://ai.studio/apps/bb00eb8b-dca8-443b-a046-f1fd630beb95
+**DealPlate** is an innovative platform designed for university campuses. It allows food vendors (like bakeries and pizzerias) to instantly list surplus meals as discounted "Mystery Bags." Students can browse the live marketplace, secure massive discounts on food, and pay seamlessly via M-Pesa. 
 
-## Run Locally
+By matching excess high-quality food with hungry students, DealPlate actively fights food waste while making campus dining incredibly affordable.
 
-**Prerequisites:**  Node.js
+## ✨ Key Features
 
+### For Vendors
+- **Live Analytics Dashboard**: Real-time insights into total revenue, pending pickups, and active listings, complete with a beautiful visual area chart.
+- **AI-Powered Deal Generation**: Leveraging the **Google Gemini API**, vendors can simply input basic ingredients and allergens, and the AI will auto-generate compelling marketing copy and detailed descriptions for their Mystery Bags.
+- **Secure Pickup Verification**: A built-in numpad system allows vendors to verify 6-digit student pickup codes securely against the live database.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### For Students
+- **Dynamic Marketplace Feed**: A live feed of all available deals from verified campus vendors, showcasing discounts (often 50%+ off).
+- **Split-Layout Deal Details**: A premium UI for viewing deal details, remaining stock urgency, and pickup specifications.
+- **M-Pesa Integration**: Frictionaless checkout simulation tailored for local payment methods.
+
+## 🛠️ Tech Stack
+
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router) with React 19
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) & [Framer Motion](https://www.framer.com/motion/)
+- **Database & Auth**: [Supabase](https://supabase.com/) (PostgreSQL)
+- **AI Integration**: [Google Gemini API](https://aistudio.google.com/) (Server Actions)
+- **Data Visualization**: [Recharts](https://recharts.org/)
+- **Icons**: [Lucide React](https://lucide.dev/)
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js (v18 or higher)
+- A Supabase Project
+- A Google Gemini API Key
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Elisha-Sani/DealPlate.git
+   cd DealPlate
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables:**
+   Rename `.env.example` to `.env.local` (or create one) and populate the following keys:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+   GEMINI_API_KEY=your_gemini_api_key
+   ```
+
+4. **Initialize the Database:**
+   Run the SQL scripts located in the `supabase/` directory in your Supabase SQL Editor to generate the schema and seed mock data.
+
+5. **Run the Development Server:**
+   ```bash
+   npm run dev
+   ```
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
