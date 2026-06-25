@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface PriceProps {
   amount: number;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   className?: string;
 }
 
@@ -14,6 +14,7 @@ const sizeClasses = {
   md: 'text-base font-bold',
   lg: 'text-lg font-bold',
   xl: 'text-2xl font-extrabold',
+  '2xl': 'text-3xl font-extrabold',
 } as const;
 
 const amountClasses = {
@@ -21,6 +22,7 @@ const amountClasses = {
   md: 'text-lg font-bold',
   lg: 'text-xl font-extrabold',
   xl: 'text-3xl font-extrabold',
+  '2xl': 'text-4xl font-black',
 } as const;
 
 export default function Price({ amount, size = 'md', className = '' }: PriceProps) {
