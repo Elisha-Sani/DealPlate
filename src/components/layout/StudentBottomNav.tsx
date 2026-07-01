@@ -10,7 +10,7 @@ export default function StudentBottomNav() {
 
   const navItems = [
     { path: '/student/explore', icon: Compass, label: 'Explore' },
-    { path: '/student/order-confirmed', icon: ReceiptText, label: 'Orders' },
+    { path: '/student/orders', icon: ReceiptText, label: 'Orders' },
     { path: '/student/profile', icon: User, label: 'Profile' },
   ] as const;
 
@@ -38,3 +38,4 @@ export default function StudentBottomNav() {
     </nav>
   );
 }
+

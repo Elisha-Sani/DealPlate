@@ -13,8 +13,12 @@ export default function StudentProfile() {
   const { user, logout } = useUser();
   const { pastOrders } = useOrders();
   
-  const [avatarPreview, setAvatarPreview] = useState<string>(user.avatar);
+  const [avatarPreview, setAvatarPreview] = useState<string>(user?.avatar || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (!user) {
+    return null;
+  }
 
   const handleLogout = () => {
     logout();

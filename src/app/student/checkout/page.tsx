@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Smartphone, Lock } from 'lucide-react';
@@ -18,8 +18,13 @@ export default function StudentCheckout() {
   const { createOrder } = useOrders();
   const [isPaying, setIsPaying] = useState(false);
 
+  useEffect(() => {
+    if (!cartDeal) {
+      router.push('/student/explore');
+    }
+  }, [cartDeal, router]);
+
   if (!cartDeal) {
-    router.push('/student/explore');
     return null;
   }
 
@@ -31,7 +36,7 @@ export default function StudentCheckout() {
     if (order) {
       updateStats(cartDeal.originalPrice - cartDeal.dealPrice);
       clearCart();
-      router.push('/student/order-confirmed');
+      router.push('/student/orders');
     } else {
       alert("Failed to secure deal. Someone might have beaten you to it!");
     }
@@ -123,3 +128,4 @@ export default function StudentCheckout() {
     </motion.div>
   );
 }
+

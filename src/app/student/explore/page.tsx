@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, X } from 'lucide-react';
 import { useDeals } from '@/hooks/useDeals';
+import { useOrders } from '@/hooks/useOrders';
 import { useUser } from '@/providers/UserProvider';
 import { useCart } from '@/providers/CartProvider';
 import Price from '@/components/ui/Price';
@@ -17,9 +18,13 @@ export default function StudentExplore() {
   const router = useRouter();
   const { user } = useUser();
   const { setCartDeal } = useCart();
+  const { pastOrders } = useOrders();
   const { filteredDeals, isLoading, searchQuery, setSearchQuery, selectedCampus, setSelectedCampus } = useDeals();
-
   const [layout, setLayout] = useState<'grid' | 'masonry'>('grid');
+
+  if (!user) {
+    return null;
+  }
 
   const handleSelectDeal = (deal: Deal) => {
     router.push(`/student/deals/${deal.id}`);
@@ -52,7 +57,7 @@ export default function StudentExplore() {
         </div>
         <div className="text-white bg-black/15 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 shrink-0 text-center">
           <span className="block text-xs uppercase tracking-wider opacity-85">Daily Saved Amount</span>
-          <Price amount={user.totalSaved} size="lg" className="text-white font-black" />
+          <Price amount={pastOrders.filter(o => o.status === 'Completed').reduce((sum, o) => sum + (o.deal.originalPrice - o.deal.dealPrice), 0)} size="lg" className="text-white font-black" />
         </div>
       </div>
 
@@ -113,3 +118,4 @@ export default function StudentExplore() {
     </motion.div>
   );
 }
+
