@@ -65,8 +65,10 @@ export function useDeals(): UseDealsReturn {
       const matchesCampus =
         selectedCampus === 'all' ||
         deal.campus.toLowerCase() === selectedCampus.toLowerCase();
+      const hasStock = deal.stockCount > 0;
+      const isPublished = deal.isPublished !== false;
 
-      return matchesSearch && matchesCampus;
+      return isPublished && hasStock && matchesSearch && matchesCampus;
     });
   }, [deals, searchQuery, selectedCampus]);
 
@@ -80,3 +82,5 @@ export function useDeals(): UseDealsReturn {
     setSelectedCampus,
   };
 }
+
+

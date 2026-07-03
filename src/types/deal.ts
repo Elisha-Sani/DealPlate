@@ -15,6 +15,7 @@ export interface Deal {
   briefDescription?: string;
   detailedDescription?: string;
   stockCount: number;
+  isPublished?: boolean;
   durationRemaining: string; // "hh:mm:ss"
 }
 
@@ -26,3 +27,4 @@ export type DealCategory =
   | 'Beverages'
   | 'Desserts'
   | 'Other';
+

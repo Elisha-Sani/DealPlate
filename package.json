@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "^2.10.0",
     "@supabase/supabase-js": "^2.49.4",
+    "axios": "^1.18.1",
     "lucide-react": "^0.475.0",
     "motion": "^12.7.3",
     "next": "16.2.4",

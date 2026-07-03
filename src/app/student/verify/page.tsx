@@ -20,6 +20,7 @@ export default function StudentVerify() {
       return;
     }
     setError('');
+    sessionStorage.setItem('dealplate_student_kyc_details', JSON.stringify({ university, regNumber }));
     router.push('/student/upload-id');
   };
 
@@ -96,3 +97,4 @@ export default function StudentVerify() {
     </motion.div>
   );
 }
+

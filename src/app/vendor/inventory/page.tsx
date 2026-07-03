@@ -1,400 +1,1016 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useRouter } from 'next/navigation';
-import { Plus, HelpCircle, Image as ImageIcon, X, Sparkles, Loader2 } from 'lucide-react';
-import VendorTopBar from '@/components/layout/VendorTopBar';
-import { supabase } from '@/lib/supabase/client';
-import { generateDealDescription } from '@/app/actions/generateDescription';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "motion/react";
+import {
+    Edit3,
+    Eye,
+    EyeOff,
+    Image as ImageIcon,
+    Loader2,
+    PackageOpen,
+    Plus,
+    RotateCcw,
+    Save,
+    Search,
+    Sparkles,
+    X,
+} from "lucide-react";
+import VendorTopBar from "@/components/layout/VendorTopBar";
+import { supabase } from "@/lib/supabase/client";
+import Price from "@/components/ui/Price";
+import { cn } from "@/lib/utils";
+import { generateDealDescription } from "@/app/actions/generateDescription";
+
+interface VendorProfile {
+    id: string;
+    business_name: string;
+}
+
+interface InventoryItem {
+    id: string;
+    title: string;
+    vendor: string;
+    campus: string;
+    originalPrice: number;
+    dealPrice: number;
+    image: string;
+    discountPercentage: number;
+    timeStart: string;
+    timeEnd: string;
+    category: string;
+    description: string;
+    briefDescription: string;
+    detailedDescription: string;
+    stockCount: number;
+    isPublished: boolean;
+    createdAt: string;
+}
+
+interface InventoryForm {
+    title: string;
+    originalPrice: string;
+    dealPrice: string;
+    stockCount: number;
+    timeStart: string;
+    timeEnd: string;
+    category: string;
+    campus: string;
+    image: string;
+    briefDescription: string;
+    detailedDescription: string;
+    isPublished: boolean;
+}
+
+const emptyForm: InventoryForm = {
+    title: "",
+    originalPrice: "",
+    dealPrice: "",
+    stockCount: 1,
+    timeStart: "",
+    timeEnd: "",
+    category: "Bakery",
+    campus: "Main Campus",
+    image: "",
+    briefDescription: "",
+    detailedDescription: "",
+    isPublished: true,
+};
+
+const categories = [
+    "Bakery",
+    "Pizza",
+    "Sushi",
+    "Burgers",
+    "Beverages",
+    "Desserts",
+    "Other",
+];
+const fallbackImage =
+    "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=600&fit=crop&q=80";
+
+function mapInventoryItem(row: any): InventoryItem {
+    return {
+        id: row.id,
+        title: row.title,
+        vendor: row.vendor,
+        campus: row.campus,
+        originalPrice: Number(row.original_price),
+        dealPrice: Number(row.deal_price),
+        image: row.image,
+        discountPercentage: Number(row.discount_percentage),
+        timeStart: String(row.time_start || "").slice(0, 5),
+        timeEnd: String(row.time_end || "").slice(0, 5),
+        category: row.category,
+        description: row.description || "",
+        briefDescription: row.brief_description || "",
+        detailedDescription: row.detailed_description || "",
+        stockCount: Number(row.stock_count),
+        isPublished: row.is_published !== false,
+        createdAt: row.created_at,
+    };
+}
 
 export default function VendorInventory() {
-  const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Form State
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [originalPrice, setOriginalPrice] = useState('');
-  const [dealPrice, setDealPrice] = useState('');
-  const [quantity, setQuantity] = useState(1);
-  const [timeStart, setTimeStart] = useState('');
-  const [timeEnd, setTimeEnd] = useState('');
-  const [briefDescription, setBriefDescription] = useState('');
-  const [detailedDescription, setDetailedDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [vendor, setVendor] = useState<VendorProfile | null>(null);
+    const [items, setItems] = useState<InventoryItem[]>([]);
+    const [form, setForm] = useState<InventoryForm>(emptyForm);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [statusFilter, setStatusFilter] = useState<
+        "all" | "published" | "unpublished" | "sold_out"
+    >("all");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [message, setMessage] = useState("");
 
-  // AI Modal State
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [dietaryTags, setDietaryTags] = useState('');
-  const [allergens, setAllergens] = useState('');
-  const [mainIngredients, setMainIngredients] = useState('');
-  const [isMysteryBag, setIsMysteryBag] = useState(false);
+    // AI Model
+    const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [dietaryTags, setDietaryTags] = useState("");
+    const [allergens, setAllergens] = useState("");
+    const [mainIngredients, setMainIngredients] = useState("");
+    const [isMysteryBag, setIsMysteryBag] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+    const fetchVendorInventory = useCallback(async () => {
+        setIsLoading(true);
+        setMessage("");
 
-  const handleGenerateAI = async () => {
-    if (!title || !originalPrice || !dealPrice) {
-      alert("Please fill in the Meal Title, Original Value, and Deal Price first!");
-      return;
-    }
+        const {
+            data: { session },
+        } = await supabase.auth.getSession();
+        let vendorQuery = supabase.from("vendors").select("id, business_name");
+        vendorQuery = session?.user?.id
+            ? vendorQuery.eq("id", session.user.id)
+            : vendorQuery.limit(1);
 
-    setIsGenerating(true);
-    const result = await generateDealDescription({
-      title,
-      originalPrice: Number(originalPrice),
-      dealPrice: Number(dealPrice),
-      dietaryTags,
-      allergens,
-      mainIngredients,
-      isMysteryBag
-    });
+        const { data: vendorData, error: vendorError } =
+            await vendorQuery.maybeSingle();
+        if (vendorError || !vendorData) {
+            setVendor(null);
+            setItems([]);
+            setIsLoading(false);
+            setMessage(
+                "No vendor profile found. The vendor must be approved before inventory can be managed.",
+            );
+            return;
+        }
 
-    if (result.success) {
-      setBriefDescription(result.briefDescription || '');
-      setDetailedDescription(result.detailedDescription || '');
-      setIsAiModalOpen(false);
-    } else {
-      alert("AI Generation failed. Check console or verify API key.");
-      console.error(result.error);
-    }
-    setIsGenerating(false);
-  };
+        setVendor(vendorData as VendorProfile);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+        const { data: dealsData, error: dealsError } = await supabase
+            .from("deals")
+            .select("*")
+            .eq("vendor_id", vendorData.id)
+            .order("created_at", { ascending: false });
 
-    const origP = Number(originalPrice) || 0;
-    const dealP = Number(dealPrice) || 0;
-    const discount = origP > 0 ? Math.round(((origP - dealP) / origP) * 100) : 0;
+        if (dealsError) {
+            setMessage(dealsError.message);
+            setItems([]);
+        } else {
+            setItems((dealsData || []).map(mapInventoryItem));
+        }
 
-    // Fetch the auto-generated mock vendor from DB
-    const { data: vendorData, error: vendorError } = await supabase
-      .from('vendors')
-      .select('id, business_name')
-      .limit(1)
-      .single();
+        setIsLoading(false);
+    }, []);
 
-    if (vendorError || !vendorData) {
-      setIsSubmitting(false);
-      alert("No vendor found in database. Please run the seed script.");
-      return;
-    }
+    useEffect(() => {
+        fetchVendorInventory();
+    }, [fetchVendorInventory]);
 
-    const payload = {
-      vendor_id: vendorData.id,
-      title,
-      vendor: vendorData.business_name, // Denormalized name
-      campus: 'Main Campus',
-      original_price: origP,
-      deal_price: dealP,
-      image: previewImage || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=600&fit=crop&q=80',
-      discount_percentage: discount,
-      time_start: timeStart,
-      time_end: timeEnd,
-      category: 'Bakery',
-      brief_description: briefDescription,
-      detailed_description: detailedDescription,
-      description: briefDescription, // fallback
-      stock_count: quantity,
-      duration_remaining: '02:00:00'
+    const filteredItems = useMemo(() => {
+        const query = searchQuery.trim().toLowerCase();
+        return items.filter((item) => {
+            const matchesQuery =
+                !query ||
+                item.title.toLowerCase().includes(query) ||
+                item.category.toLowerCase().includes(query);
+            const matchesStatus =
+                statusFilter === "all" ||
+                (statusFilter === "published" &&
+                    item.isPublished &&
+                    item.stockCount > 0) ||
+                (statusFilter === "unpublished" && !item.isPublished) ||
+                (statusFilter === "sold_out" && item.stockCount === 0);
+            return matchesQuery && matchesStatus;
+        });
+    }, [items, searchQuery, statusFilter]);
+
+    const updateForm = <K extends keyof InventoryForm>(
+        key: K,
+        value: InventoryForm[K],
+    ) => {
+        setForm((prev) => ({ ...prev, [key]: value }));
     };
 
-    const { error } = await supabase.from('deals').insert(payload);
-    setIsSubmitting(false);
+    const resetForm = () => {
+        setForm(emptyForm);
+        setEditingId(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
 
-    if (error) {
-      alert("Failed to publish deal. Check console.");
-      console.error(error);
-    } else {
-      router.push('/vendor/dashboard');
-    }
-  };
+    const startEdit = (item: InventoryItem) => {
+        setEditingId(item.id);
+        setForm({
+            title: item.title,
+            originalPrice: String(item.originalPrice),
+            dealPrice: String(item.dealPrice),
+            stockCount: item.stockCount,
+            timeStart: item.timeStart,
+            timeEnd: item.timeEnd,
+            category: item.category,
+            campus: item.campus,
+            image: item.image,
+            briefDescription: item.briefDescription || item.description,
+            detailedDescription: item.detailedDescription,
+            isPublished: item.isPublished,
+        });
+    };
 
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col flex-1 pb-10 relative">
-      <VendorTopBar title="List Surplus Inventory" />
-      <div className="p-8 max-w-3xl mx-auto w-full">
-        <p className="text-gray-500 mb-6">Quickly add excess daily items to the campus feed.</p>
-        <form className="bg-white rounded-xl border border-[#E2E8F0] p-8 shadow-sm space-y-8" onSubmit={handleSubmit}>
-          
-          {/* Image Upload Section */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold text-[#1E293B] border-b border-[#E2E8F0] pb-2">Product Image</h3>
-            <div 
-              className={`relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${previewImage ? 'border-[#FF6B00] bg-orange-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'}`}
-              onClick={() => !previewImage && fileInputRef.current?.click()}
-            >
-              {previewImage ? (
-                <>
-                  <img src={previewImage} alt="Preview" className="w-full h-full object-cover rounded-xl" />
-                  <button 
-                    type="button" 
-                    onClick={(e) => { e.stopPropagation(); setPreviewImage(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
-                    className="absolute top-2 right-2 bg-white/80 p-1.5 rounded-full shadow-md text-red-500 hover:bg-white transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                  <ImageIcon className="w-10 h-10 text-gray-400 mb-3" />
-                  <p className="mb-2 text-sm text-gray-500"><span className="font-semibold text-[#FF6B00]">Click to upload</span> or drag and drop</p>
-                  <p className="text-xs text-gray-500">PNG, JPG or WEBP (Max 2MB)</p>
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 1_500_000) {
+            setMessage("Use an image under 1.5MB.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = () => updateForm("image", reader.result as string);
+        reader.readAsDataURL(file);
+    };
+
+    const handleGenerateAI = async () => {
+        if (!form.title || !form.originalPrice || !form.dealPrice) {
+            alert(
+                "Please fill in the Meal Title, Original Value, and Deal Price first!",
+            );
+            return;
+        }
+
+        setIsGenerating(true);
+        const result = await generateDealDescription({
+            title: form.title,
+            originalPrice: Number(form.originalPrice),
+            dealPrice: Number(form.dealPrice),
+            dietaryTags,
+            allergens,
+            mainIngredients,
+            isMysteryBag,
+        });
+
+        if (result.success) {
+            updateForm("briefDescription", result.briefDescription || "");
+            updateForm("detailedDescription", result.detailedDescription || "");
+            setIsAiModalOpen(false);
+        } else {
+            alert("AI Generation failed. Check console or verify API key.");
+            console.error(result.error);
+        }
+        setIsGenerating(false);
+    };
+
+    const buildPayload = () => {
+        if (!vendor) return null;
+        const original = Number(form.originalPrice) || 0;
+        const deal = Number(form.dealPrice) || 0;
+        const discount =
+            original > 0
+                ? Math.max(0, Math.round(((original - deal) / original) * 100))
+                : 0;
+
+        return {
+            vendor_id: vendor.id,
+            vendor: vendor.business_name,
+            title: form.title.trim(),
+            campus: form.campus.trim() || "Main Campus",
+            original_price: original,
+            deal_price: deal,
+            image: form.image || fallbackImage,
+            discount_percentage: discount,
+            time_start: form.timeStart,
+            time_end: form.timeEnd,
+            category: form.category,
+            tags: [form.category],
+            description:
+                form.briefDescription || form.detailedDescription || form.title,
+            brief_description: form.briefDescription,
+            detailed_description: form.detailedDescription,
+            stock_count: form.stockCount,
+            is_published: form.isPublished,
+            duration_remaining: "02:00:00",
+        };
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = buildPayload();
+        if (!payload) return;
+
+        if (
+            !payload.title ||
+            payload.original_price <= 0 ||
+            payload.deal_price <= 0 ||
+            !payload.time_start ||
+            !payload.time_end
+        ) {
+            setMessage("Fill in title, prices, and collection window.");
+            return;
+        }
+
+        setIsSaving(true);
+        setMessage(editingId ? "Saving item..." : "Creating item...");
+
+        const request = editingId
+            ? supabase.from("deals").update(payload).eq("id", editingId)
+            : supabase.from("deals").insert(payload);
+
+        const { error } = await request;
+        setIsSaving(false);
+
+        if (error) {
+            setMessage(error.message);
+            return;
+        }
+
+        setMessage(
+            editingId ? "Inventory item updated." : "Inventory item created.",
+        );
+        resetForm();
+        await fetchVendorInventory();
+    };
+
+    const togglePublished = async (item: InventoryItem) => {
+        setMessage(
+            item.isPublished ? "Unpublishing item..." : "Publishing item...",
+        );
+        const { error } = await supabase
+            .from("deals")
+            .update({ is_published: !item.isPublished })
+            .eq("id", item.id);
+
+        if (error) {
+            setMessage(error.message);
+            return;
+        }
+
+        setItems((prev) =>
+            prev.map((current) =>
+                current.id === item.id
+                    ? { ...current, isPublished: !item.isPublished }
+                    : current,
+            ),
+        );
+        setMessage(
+            item.isPublished
+                ? "Item hidden from Explore."
+                : "Item published to Explore.",
+        );
+    };
+
+    const stats = {
+        total: items.length,
+        published: items.filter(
+            (item) => item.isPublished && item.stockCount > 0,
+        ).length,
+        hidden: items.filter((item) => !item.isPublished).length,
+        soldOut: items.filter((item) => item.stockCount === 0).length,
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col flex-1 pb-10 relative"
+        >
+            <VendorTopBar title="Inventory" />
+            <div className="p-8 max-w-7xl mx-auto w-full space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-[#1E293B]">
+                            Manage surplus items
+                        </h1>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Edit stock, pricing, collection windows, and publish
+                            status from one place.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={resetForm}
+                        className="h-10 px-4 rounded-lg bg-[#FF6B00] text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#e66000] active:scale-95 transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Item
+                    </button>
                 </div>
-              )}
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+
+                {message && (
+                    <div className="bg-white border border-[#E2E8F0] rounded-lg px-4 py-3 text-sm font-semibold text-[#1E293B] shadow-sm">
+                        {message}
+                    </div>
+                )}
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="bg-white border border-[#E2E8F0] rounded-lg p-4">
+                        <p className="text-xs text-gray-500 font-bold uppercase">
+                            Total
+                        </p>
+                        <p className="text-2xl font-black text-[#1E293B]">
+                            {stats.total}
+                        </p>
+                    </div>
+                    <div className="bg-white border border-[#E2E8F0] rounded-lg p-4">
+                        <p className="text-xs text-gray-500 font-bold uppercase">
+                            Published
+                        </p>
+                        <p className="text-2xl font-black text-green-600">
+                            {stats.published}
+                        </p>
+                    </div>
+                    <div className="bg-white border border-[#E2E8F0] rounded-lg p-4">
+                        <p className="text-xs text-gray-500 font-bold uppercase">
+                            Hidden
+                        </p>
+                        <p className="text-2xl font-black text-gray-600">
+                            {stats.hidden}
+                        </p>
+                    </div>
+                    <div className="bg-white border border-[#E2E8F0] rounded-lg p-4">
+                        <p className="text-xs text-gray-500 font-bold uppercase">
+                            Sold Out
+                        </p>
+                        <p className="text-2xl font-black text-[#E11D48]">
+                            {stats.soldOut}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                    <section className="xl:col-span-5 bg-white rounded-xl border border-[#E2E8F0] p-6 shadow-sm">
+                        <div className="flex items-center justify-between gap-3 border-b border-[#E2E8F0] pb-4 mb-5">
+                            <div>
+                                <h2 className="text-lg font-bold text-[#1E293B]">
+                                    {editingId ? "Edit item" : "Create item"}
+                                </h2>
+                                <p className="text-xs text-gray-500">
+                                    Published items with stock appear in
+                                    Explore.
+                                </p>
+                            </div>
+                            {editingId && (
+                                <button
+                                    type="button"
+                                    onClick={resetForm}
+                                    className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-bold text-gray-600 flex items-center gap-1 hover:bg-gray-50"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" /> Reset
+                                </button>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                    Item title
+                                </label>
+                                <input
+                                    value={form.title}
+                                    onChange={(e) =>
+                                        updateForm("title", e.target.value)
+                                    }
+                                    required
+                                    className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    placeholder="Mystery Pastry Bag"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Original price
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={form.originalPrice}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "originalPrice",
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Deal price
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={form.dealPrice}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "dealPrice",
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Stock
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        value={form.stockCount}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "stockCount",
+                                                Math.max(
+                                                    0,
+                                                    Number(e.target.value) || 0,
+                                                ),
+                                            )
+                                        }
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Category
+                                    </label>
+                                    <select
+                                        value={form.category}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "category",
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    >
+                                        {categories.map((category) => (
+                                            <option
+                                                key={category}
+                                                value={category}
+                                            >
+                                                {category}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Start
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={form.timeStart}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "timeStart",
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        End
+                                    </label>
+                                    <input
+                                        type="time"
+                                        value={form.timeEnd}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "timeEnd",
+                                                e.target.value,
+                                            )
+                                        }
+                                        required
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                    Campus
+                                </label>
+                                <input
+                                    value={form.campus}
+                                    onChange={(e) =>
+                                        updateForm("campus", e.target.value)
+                                    }
+                                    className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                    Product image
+                                </label>
+                                <div className="flex gap-3 items-center">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            fileInputRef.current?.click()
+                                        }
+                                        className="h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#1E293B] hover:bg-gray-50 flex items-center gap-2"
+                                    >
+                                        <ImageIcon className="w-4 h-4" /> Upload
+                                    </button>
+                                    {form.image && (
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                updateForm("image", "")
+                                            }
+                                            className="h-11 w-11 rounded-lg border border-[#E2E8F0] text-red-500 hover:bg-red-50 flex items-center justify-center"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                    />
+                                    <span className="text-xs text-gray-500 truncate">
+                                        {form.image
+                                            ? "Image selected"
+                                            : "Default image used if empty"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <label className="block text-sm font-medium text-[#1E293B]">
+                                    Brief description
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAiModalOpen(true)}
+                                    className="text-xs font-bold text-[#FF6B00] hover:text-[#e66000] flex items-center gap-1"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5" />{" "}
+                                    Generate with AI
+                                </button>
+                            </div>
+                            <textarea
+                                value={form.briefDescription}
+                                onChange={(e) =>
+                                    updateForm(
+                                        "briefDescription",
+                                        e.target.value,
+                                    )
+                                }
+                                className="w-full h-20 p-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm resize-none"
+                            />
+
+                            {/* <div>
+                                <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                    Brief description
+                                </label>
+                                <textarea
+                                    value={form.briefDescription}
+                                    onChange={(e) =>
+                                        updateForm(
+                                            "briefDescription",
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="w-full h-20 p-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm resize-none"
+                                />
+                            </div> */}
+
+                            <div>
+                                <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                    Detailed description
+                                </label>
+                                <textarea
+                                    value={form.detailedDescription}
+                                    onChange={(e) =>
+                                        updateForm(
+                                            "detailedDescription",
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="w-full h-28 p-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm resize-none"
+                                />
+                            </div>
+
+                            <label className="flex items-center justify-between gap-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4 cursor-pointer">
+                                <span>
+                                    <span className="block text-sm font-bold text-[#1E293B]">
+                                        Publish to Explore
+                                    </span>
+                                    <span className="block text-xs text-gray-500">
+                                        Turn off to keep this item hidden from
+                                        students.
+                                    </span>
+                                </span>
+                                <input
+                                    type="checkbox"
+                                    checked={form.isPublished}
+                                    onChange={(e) =>
+                                        updateForm(
+                                            "isPublished",
+                                            e.target.checked,
+                                        )
+                                    }
+                                    className="w-5 h-5 accent-[#FF6B00]"
+                                />
+                            </label>
+
+                            <button
+                                type="submit"
+                                disabled={isSaving}
+                                className="w-full h-12 rounded-lg bg-[#FF6B00] disabled:bg-orange-300 text-white font-bold flex items-center justify-center gap-2 hover:bg-[#e66000] active:scale-95 transition-all"
+                            >
+                                {isSaving ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Save className="w-4 h-4" />
+                                )}
+                                {editingId
+                                    ? "Save Changes"
+                                    : "Create Inventory Item"}
+                            </button>
+                        </form>
+                    </section>
+
+                    <section className="xl:col-span-7 bg-white rounded-xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+                        <div className="p-5 border-b border-[#E2E8F0] space-y-4">
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="text-lg font-bold text-[#1E293B]">
+                                    Inventory Items
+                                </h2>
+                                {isLoading && (
+                                    <Loader2 className="w-5 h-5 animate-spin text-[#FF6B00]" />
+                                )}
+                            </div>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                    <input
+                                        value={searchQuery}
+                                        onChange={(e) =>
+                                            setSearchQuery(e.target.value)
+                                        }
+                                        placeholder="Search items"
+                                        className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00]"
+                                    />
+                                </div>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) =>
+                                        setStatusFilter(
+                                            e.target
+                                                .value as typeof statusFilter,
+                                        )
+                                    }
+                                    className="h-10 px-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00]"
+                                >
+                                    <option value="all">All items</option>
+                                    <option value="published">Published</option>
+                                    <option value="unpublished">
+                                        Unpublished
+                                    </option>
+                                    <option value="sold_out">Sold out</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="divide-y divide-[#E2E8F0]">
+                            {filteredItems.length === 0 ? (
+                                <div className="p-10 text-center flex flex-col items-center">
+                                    <PackageOpen className="w-10 h-10 text-gray-300 mb-3" />
+                                    <h3 className="font-bold text-[#1E293B]">
+                                        No inventory items found
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Create an item or adjust the filters
+                                        above.
+                                    </p>
+                                </div>
+                            ) : (
+                                filteredItems.map((item) => (
+                                    <article
+                                        key={item.id}
+                                        className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-[#F8FAFC] transition-colors"
+                                    >
+                                        <img
+                                            src={item.image || fallbackImage}
+                                            alt={item.title}
+                                            className="w-full md:w-24 h-32 md:h-20 object-cover rounded-lg border border-[#E2E8F0] bg-gray-100 shrink-0"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                <h3 className="font-bold text-[#1E293B] truncate">
+                                                    {item.title}
+                                                </h3>
+                                                <span
+                                                    className={cn(
+                                                        "text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full",
+                                                        item.isPublished
+                                                            ? "bg-green-50 text-green-600"
+                                                            : "bg-gray-100 text-gray-500",
+                                                    )}
+                                                >
+                                                    {item.isPublished
+                                                        ? "Published"
+                                                        : "Hidden"}
+                                                </span>
+                                                {item.stockCount === 0 && (
+                                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 text-[#E11D48]">
+                                                        Sold out
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-gray-500 line-clamp-1">
+                                                {item.briefDescription ||
+                                                    item.description ||
+                                                    item.category}
+                                            </p>
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
+                                                <span>{item.category}</span>
+                                                <span>{item.campus}</span>
+                                                <span>
+                                                    {item.timeStart} -{" "}
+                                                    {item.timeEnd}
+                                                </span>
+                                                <span>
+                                                    {item.stockCount} left
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex md:flex-col items-center md:items-end justify-between gap-3 md:w-36 shrink-0">
+                                            <Price
+                                                amount={item.dealPrice}
+                                                size="sm"
+                                                className="text-[#FF6B00]"
+                                            />
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        startEdit(item)
+                                                    }
+                                                    className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-bold text-[#1E293B] hover:bg-white flex items-center gap-1"
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5" />{" "}
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        togglePublished(item)
+                                                    }
+                                                    className={cn(
+                                                        "h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1",
+                                                        item.isPublished
+                                                            ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                                            : "bg-green-600 text-white hover:bg-green-700",
+                                                    )}
+                                                >
+                                                    {item.isPublished ? (
+                                                        <EyeOff className="w-3.5 h-3.5" />
+                                                    ) : (
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                    )}
+                                                    {item.isPublished
+                                                        ? "Unpublish"
+                                                        : "Publish"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))
+                            )}
+                        </div>
+                    </section>
+                </div>
             </div>
-          </div>
 
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-[#1E293B] border-b border-[#E2E8F0] pb-2">Item Details</h3>
-            <div>
-              <label className="block text-sm font-medium text-[#1E293B] mb-2">Meal / Bag Title <span className="text-red-500">*</span></label>
-              <input 
-                type="text" 
-                required 
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="e.g., Mystery Pastry Bag" 
-                className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all" 
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[#1E293B] mb-2">Original Value (Ksh)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Ksh</span>
-                  <input 
-                    type="number" 
-                    value={originalPrice}
-                    onChange={e => setOriginalPrice(e.target.value)}
-                    placeholder="0.00" 
-                    className="w-full h-11 pl-12 pr-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all" 
-                  />
+            {isAiModalOpen && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-lg w-full max-w-md p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-[#1E293B]">
+                                Generate description with AI
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={() => setIsAiModalOpen(false)}
+                                className="text-gray-400 hover:text-[#1E293B]"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                            Uses the title, original price, and deal price
+                            already entered in the form on the left, plus the
+                            details below.
+                        </p>
+
+                        <div>
+                            <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                Dietary tags
+                            </label>
+                            <input
+                                value={dietaryTags}
+                                onChange={(e) => setDietaryTags(e.target.value)}
+                                placeholder="Vegetarian, Halal, Gluten-free..."
+                                className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                Allergens
+                            </label>
+                            <input
+                                value={allergens}
+                                onChange={(e) => setAllergens(e.target.value)}
+                                placeholder="Nuts, Dairy, Shellfish..."
+                                className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                Main ingredients
+                            </label>
+                            <input
+                                value={mainIngredients}
+                                onChange={(e) =>
+                                    setMainIngredients(e.target.value)
+                                }
+                                placeholder="Chicken, rice, mixed vegetables..."
+                                className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                            />
+                        </div>
+
+                        <label className="flex items-center justify-between gap-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-4 cursor-pointer">
+                            <span className="text-sm font-bold text-[#1E293B]">
+                                This is a mystery bag
+                            </span>
+                            <input
+                                type="checkbox"
+                                checked={isMysteryBag}
+                                onChange={(e) =>
+                                    setIsMysteryBag(e.target.checked)
+                                }
+                                className="w-5 h-5 accent-[#FF6B00]"
+                            />
+                        </label>
+
+                        <div className="flex gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsAiModalOpen(false)}
+                                className="flex-1 h-11 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#1E293B] hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleGenerateAI}
+                                disabled={isGenerating}
+                                className="flex-1 h-11 rounded-lg bg-[#FF6B00] disabled:bg-orange-300 text-white text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#e66000]"
+                            >
+                                {isGenerating ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Sparkles className="w-4 h-4" />
+                                )}
+                                {isGenerating ? "Generating..." : "Generate"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#1E293B] mb-2">Deal Price (Ksh) <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Ksh</span>
-                  <input 
-                    type="number" 
-                    required 
-                    value={dealPrice}
-                    onChange={e => setDealPrice(e.target.value)}
-                    placeholder="0.00" 
-                    className="w-full h-11 pl-12 pr-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all" 
-                  />
-                </div>
-                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1"><HelpCircle className="w-3.5 h-3.5" /> Must be 50-70% off original value.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="flex justify-between items-end border-b border-[#E2E8F0] pb-2">
-              <h3 className="text-lg font-bold text-[#1E293B]">Descriptions</h3>
-              <button 
-                type="button" 
-                onClick={() => setIsAiModalOpen(true)}
-                className="text-xs font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Auto-fill with AI
-              </button>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-[#1E293B] mb-2">Brief Tagline (max 100 chars)</label>
-              <textarea 
-                value={briefDescription}
-                onChange={e => setBriefDescription(e.target.value)}
-                placeholder="A single, mouth-watering sentence..."
-                className="w-full h-20 p-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all resize-none"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-[#1E293B] mb-2">Detailed Description</label>
-              <textarea 
-                value={detailedDescription}
-                onChange={e => setDetailedDescription(e.target.value)}
-                placeholder="List exactly what's inside the meal or bag, along with dietary tags and allergens..."
-                className="w-full h-32 p-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-lg font-bold text-[#1E293B] border-b border-[#E2E8F0] pb-2">Availability &amp; Collection</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-[#1E293B] mb-2">Quantity Available <span className="text-red-500">*</span></label>
-                <div className="flex items-center h-11 border border-[#E2E8F0] rounded-lg overflow-hidden">
-                  <button 
-                    type="button" 
-                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                    className="w-11 h-full bg-[#F8FAFC] hover:bg-[#E2E8F0] flex items-center justify-center font-bold text-gray-600 transition-colors"
-                  >-</button>
-                  <input 
-                    type="number" 
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="flex-1 h-full text-center outline-none bg-white text-sm" 
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => setQuantity(q => q + 1)}
-                    className="w-11 h-full bg-[#F8FAFC] hover:bg-[#E2E8F0] flex items-center justify-center font-bold text-gray-600 transition-colors"
-                  >+</button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#1E293B] mb-2">Collection Window <span className="text-red-500">*</span></label>
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="time" 
-                    required
-                    value={timeStart}
-                    onChange={e => setTimeStart(e.target.value)}
-                    className="flex-1 h-11 px-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all text-gray-600" 
-                  />
-                  <span className="text-gray-400 text-sm">to</span>
-                  <input 
-                    type="time" 
-                    required
-                    value={timeEnd}
-                    onChange={e => setTimeEnd(e.target.value)}
-                    className="flex-1 h-11 px-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm transition-all text-gray-600" 
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#E2E8F0]">
-            <button type="button" onClick={() => router.push('/vendor/dashboard')} className="px-6 py-2.5 border border-[#E2E8F0] rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="px-6 py-2.5 bg-[#FF6B00] hover:bg-[#e66000] disabled:bg-orange-300 text-white rounded-lg font-bold flex items-center gap-2 transition-colors">
-              <Plus className="w-5 h-5" /> {isSubmitting ? 'Publishing...' : 'Publish Live to Campus Feed'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* AI Pre-text Questions Modal */}
-      <AnimatePresence>
-        {isAiModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }} 
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setIsAiModalOpen(false)}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
-              className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 z-10"
-            >
-              <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
-                <div className="flex items-center gap-2 text-purple-600">
-                  <Sparkles className="w-5 h-5" />
-                  <h3 className="text-xl font-bold font-display text-gray-900">AI Description Generator</h3>
-                </div>
-                <button onClick={() => setIsAiModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                <p className="text-sm text-gray-500 leading-relaxed">
-                  Provide a few details below to help our AI write an accurate and appetizing description. Leave anything blank if not applicable.
-                </p>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Main Ingredients</label>
-                  <input 
-                    type="text" 
-                    value={mainIngredients}
-                    onChange={e => setMainIngredients(e.target.value)}
-                    placeholder="e.g. Rice, Chicken breasts, Vegetables" 
-                    className="w-full h-11 px-4 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all" 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Dietary Tags</label>
-                  <input 
-                    type="text" 
-                    value={dietaryTags}
-                    onChange={e => setDietaryTags(e.target.value)}
-                    placeholder="e.g. Halal, Vegan, Vegetarian, Gluten-Free" 
-                    className="w-full h-11 px-4 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all" 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">Allergens (if any)</label>
-                  <input 
-                    type="text" 
-                    value={allergens}
-                    onChange={e => setAllergens(e.target.value)}
-                    placeholder="e.g. Contains Nuts, Dairy, Soy" 
-                    className="w-full h-11 px-4 rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-purple-500 outline-none text-sm transition-all" 
-                  />
-                </div>
-
-                <div className="flex items-center gap-3 mt-4 bg-purple-50 p-3 rounded-lg border border-purple-100">
-                  <input
-                    type="checkbox"
-                    id="mysteryBagToggle"
-                    checked={isMysteryBag}
-                    onChange={(e) => setIsMysteryBag(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 rounded border-purple-300 focus:ring-purple-500 cursor-pointer"
-                  />
-                  <label htmlFor="mysteryBagToggle" className="text-sm font-medium text-purple-900 cursor-pointer select-none">
-                    This is a Mystery Bag (Hide exact ingredients)
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button 
-                  type="button" 
-                  onClick={() => setIsAiModalOpen(false)} 
-                  className="px-5 py-2.5 rounded-lg font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleGenerateAI}
-                  disabled={isGenerating}
-                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg font-bold flex items-center gap-2 transition-colors shadow-sm"
-                >
-                  {isGenerating ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-                  ) : (
-                    <><Sparkles className="w-4 h-4" /> Generate Copy</>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </motion.div>
-  );
+            )}
+        </motion.div>
+    );
 }

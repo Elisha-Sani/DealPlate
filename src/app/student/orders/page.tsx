@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
-import { Clock, ReceiptText, ShoppingBag } from 'lucide-react';
+import { CheckCircle2, Clock, ShoppingBag } from 'lucide-react';
 import { useOrders } from '@/hooks/useOrders';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Price from '@/components/ui/Price';
@@ -10,6 +11,11 @@ import Price from '@/components/ui/Price';
 export default function StudentOrders() {
   const router = useRouter();
   const { pastOrders, isLoading } = useOrders();
+  const [wasJustConfirmed, setWasJustConfirmed] = useState(false);
+
+  useEffect(() => {
+    setWasJustConfirmed(new URLSearchParams(window.location.search).get('confirmed') === '1');
+  }, []);
 
   if (isLoading) {
     return <LoadingSpinner message="Loading your orders..." />;
@@ -37,6 +43,16 @@ export default function StudentOrders() {
           Browse Deals
         </button>
       </div>
+
+      {wasJustConfirmed && (
+        <div className="bg-green-50 border border-green-100 text-green-700 rounded-xl p-4 shadow-sm flex items-center gap-3">
+          <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <div>
+            <p className="font-bold text-sm">Order confirmed</p>
+            <p className="text-xs text-green-700/80">Your pickup code is now available under ready for pickup.</p>
+          </div>
+        </div>
+      )}
 
       {pastOrders.length === 0 ? (
         <div className="bg-white border border-[#F3F4F6] rounded-xl p-10 text-center shadow-sm">
@@ -117,3 +133,5 @@ export default function StudentOrders() {
     </motion.div>
   );
 }
+
+

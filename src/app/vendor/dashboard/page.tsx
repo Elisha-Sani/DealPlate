@@ -70,10 +70,11 @@ export default function VendorDashboard() {
         tags: d.tags || [],
         description: d.description,
         stockCount: d.stock_count,
+        isPublished: d.is_published !== false,
         durationRemaining: d.duration_remaining
       }));
       setDeals(mappedDeals);
-      setActiveBags(mappedDeals.reduce((sum, d) => sum + d.stockCount, 0));
+      setActiveBags(mappedDeals.filter((d) => d.isPublished !== false).reduce((sum, d) => sum + d.stockCount, 0));
     }
 
     // 3. Get Orders
@@ -100,6 +101,7 @@ export default function VendorDashboard() {
           timeEnd: o.deal.time_end,
           category: o.deal.category,
           stockCount: o.deal.stock_count,
+          isPublished: o.deal.is_published !== false,
           durationRemaining: o.deal.duration_remaining
         } as Deal,
         student: o.student ? {
@@ -199,3 +201,4 @@ export default function VendorDashboard() {
     </motion.div>
   );
 }
+

@@ -36,7 +36,7 @@ export default function StudentCheckout() {
     if (order) {
       updateStats(cartDeal.originalPrice - cartDeal.dealPrice);
       clearCart();
-      router.push('/student/orders');
+      router.push('/student/orders?confirmed=1');
     } else {
       alert("Failed to secure deal. Someone might have beaten you to it!");
     }
@@ -128,4 +128,5 @@ export default function StudentCheckout() {
     </motion.div>
   );
 }
+
 

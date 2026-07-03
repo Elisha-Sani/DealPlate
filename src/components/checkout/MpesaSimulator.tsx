@@ -64,7 +64,7 @@ export default function MpesaSimulator({
         </div>
 
         {/* Step Content */}
-        <div className="w-full flex flex-col gap-2 min-h-[96px] justify-center mb-6">
+        <div className="w-full flex flex-col gap-2 min-h-24 justify-center mb-6">
           {step === 1 && (
             <div className="animate-pulse">
               <p className="text-sm font-semibold text-[#111827]">Connecting to Daraja API...</p>

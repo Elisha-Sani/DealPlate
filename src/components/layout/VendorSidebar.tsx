@@ -66,9 +66,10 @@ export default function VendorSidebar() {
           className="w-full bg-[#FF6B00] hover:bg-[#e66000] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors"
         >
           <Plus className="w-5 h-5" />
-          <span>New Order</span>
+          <span>New Item</span>
         </button>
       </div>
     </div>
   );
 }
+

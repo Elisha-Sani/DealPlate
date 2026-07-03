@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS public.deals (
     brief_description text,
     detailed_description text,
     stock_count integer NOT NULL DEFAULT 0,
+    is_published boolean NOT NULL DEFAULT true,
     duration_remaining text NOT NULL DEFAULT '00:00:00',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
@@ -100,12 +101,15 @@ CREATE TABLE IF NOT EXISTS public.orders (
         CHECK (pickup_code IS NULL OR pickup_code ~ '^[0-9]{6}$')
 );
 
+ALTER TABLE public.deals ADD COLUMN IF NOT EXISTS is_published boolean NOT NULL DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS vendors_status_idx ON public.vendors(status);
 CREATE INDEX IF NOT EXISTS student_profiles_is_verified_idx ON public.student_profiles(is_verified);
 CREATE INDEX IF NOT EXISTS deals_vendor_id_idx ON public.deals(vendor_id);
 CREATE INDEX IF NOT EXISTS deals_campus_idx ON public.deals(campus);
 CREATE INDEX IF NOT EXISTS deals_category_idx ON public.deals(category);
 CREATE INDEX IF NOT EXISTS deals_created_at_idx ON public.deals(created_at DESC);
+CREATE INDEX IF NOT EXISTS deals_is_published_idx ON public.deals(is_published);
 CREATE INDEX IF NOT EXISTS orders_user_id_idx ON public.orders(user_id);
 CREATE INDEX IF NOT EXISTS orders_deal_id_idx ON public.orders(deal_id);
 CREATE INDEX IF NOT EXISTS orders_status_idx ON public.orders(status);
@@ -269,3 +273,230 @@ EXCEPTION
     WHEN duplicate_object OR undefined_object THEN NULL;
 END;
 $$;
+
+-- ============================================================
+-- 7. KYC APPLICATIONS & SUPERADMIN REVIEW
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.student_kyc_applications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id uuid NOT NULL REFERENCES public.student_profiles(id) ON DELETE CASCADE,
+    full_name text NOT NULL,
+    email text,
+    phone text,
+    university text NOT NULL,
+    reg_number text NOT NULL,
+    student_id_file_name text NOT NULL,
+    university_doc_file_name text NOT NULL,
+    university_doc_date date NOT NULL,
+    document_data jsonb NOT NULL DEFAULT '{}'::jsonb,
+    ai_recommendation text NOT NULL DEFAULT 'needs_review',
+    ai_confidence integer NOT NULL DEFAULT 0,
+    ai_summary text,
+    ai_flags text[] NOT NULL DEFAULT ARRAY[]::text[],
+    status text NOT NULL DEFAULT 'pending_review',
+    admin_notes text,
+    reviewed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT student_kyc_status_check
+        CHECK (status IN ('pending_review', 'approved', 'rejected')),
+    CONSTRAINT student_kyc_ai_recommendation_check
+        CHECK (ai_recommendation IN ('approve', 'needs_review', 'reject')),
+    CONSTRAINT student_kyc_ai_confidence_check
+        CHECK (ai_confidence BETWEEN 0 AND 100)
+);
+
+CREATE TABLE IF NOT EXISTS public.vendor_applications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    auth_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+    business_name text NOT NULL,
+    contact_name text NOT NULL,
+    email text NOT NULL,
+    phone text NOT NULL,
+    address text NOT NULL,
+    campus_proximity text NOT NULL,
+    status text NOT NULL DEFAULT 'pending_review',
+    admin_notes text,
+    reviewed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT vendor_applications_status_check
+        CHECK (status IN ('pending_review', 'approved', 'rejected')),
+    CONSTRAINT vendor_applications_email_check
+        CHECK (position('@' in email) > 1)
+);
+
+ALTER TABLE public.vendor_applications ADD COLUMN IF NOT EXISTS auth_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS student_kyc_applications_student_id_idx ON public.student_kyc_applications(student_id);
+CREATE INDEX IF NOT EXISTS student_kyc_applications_status_idx ON public.student_kyc_applications(status);
+CREATE INDEX IF NOT EXISTS vendor_applications_status_idx ON public.vendor_applications(status);
+CREATE INDEX IF NOT EXISTS vendor_applications_email_idx ON public.vendor_applications(email);
+
+DROP TRIGGER IF EXISTS student_kyc_applications_set_updated_at ON public.student_kyc_applications;
+CREATE TRIGGER student_kyc_applications_set_updated_at
+BEFORE UPDATE ON public.student_kyc_applications
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS vendor_applications_set_updated_at ON public.vendor_applications;
+CREATE TRIGGER vendor_applications_set_updated_at
+BEFORE UPDATE ON public.vendor_applications
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.student_kyc_applications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vendor_applications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Students can create their own KYC applications" ON public.student_kyc_applications;
+DROP POLICY IF EXISTS "Students can view their own KYC applications" ON public.student_kyc_applications;
+DROP POLICY IF EXISTS "Superadmin dashboard can review student KYC" ON public.student_kyc_applications;
+DROP POLICY IF EXISTS "Anyone can submit vendor applications" ON public.vendor_applications;
+DROP POLICY IF EXISTS "Superadmin dashboard can review vendor applications" ON public.vendor_applications;
+
+CREATE POLICY "Students can create their own KYC applications"
+ON public.student_kyc_applications
+FOR INSERT
+WITH CHECK (auth.uid() = student_id);
+
+CREATE POLICY "Students can view their own KYC applications"
+ON public.student_kyc_applications
+FOR SELECT
+USING (auth.uid() = student_id);
+
+CREATE POLICY "Superadmin dashboard can review student KYC"
+ON public.student_kyc_applications
+FOR ALL
+USING (true)
+WITH CHECK (true);
+
+CREATE POLICY "Anyone can submit vendor applications"
+ON public.vendor_applications
+FOR INSERT
+WITH CHECK (true);
+
+CREATE POLICY "Superadmin dashboard can review vendor applications"
+ON public.vendor_applications
+FOR ALL
+USING (true)
+WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION public.review_student_kyc_application(
+    p_application_id uuid,
+    p_status text,
+    p_admin_notes text DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_student_id uuid;
+BEGIN
+    IF p_status NOT IN ('approved', 'rejected') THEN
+        RAISE EXCEPTION 'Invalid KYC review status: %', p_status;
+    END IF;
+
+    UPDATE public.student_kyc_applications
+       SET status = p_status,
+           auth_user_id = COALESCE(v_user_id, auth_user_id),
+           admin_notes = p_admin_notes,
+           reviewed_at = now()
+     WHERE id = p_application_id
+     RETURNING student_id INTO v_student_id;
+
+    IF v_student_id IS NULL THEN
+        RAISE EXCEPTION 'Student KYC application not found.';
+    END IF;
+
+    IF p_status = 'approved' THEN
+        UPDATE public.student_profiles
+           SET is_verified = true
+         WHERE id = v_student_id;
+    END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.review_vendor_application(
+    p_application_id uuid,
+    p_status text,
+    p_admin_notes text DEFAULT NULL
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+    v_app public.vendor_applications%ROWTYPE;
+    v_user_id uuid;
+BEGIN
+    IF p_status NOT IN ('approved', 'rejected') THEN
+        RAISE EXCEPTION 'Invalid vendor review status: %', p_status;
+    END IF;
+
+    SELECT * INTO v_app
+      FROM public.vendor_applications
+     WHERE id = p_application_id;
+
+    IF v_app.id IS NULL THEN
+        RAISE EXCEPTION 'Vendor application not found.';
+    END IF;
+
+    UPDATE public.vendor_applications
+       SET status = p_status,
+           auth_user_id = COALESCE(v_user_id, auth_user_id),
+           admin_notes = p_admin_notes,
+           reviewed_at = now()
+     WHERE id = p_application_id;
+
+    IF p_status = 'approved' THEN
+        v_user_id := v_app.auth_user_id;
+
+        IF v_user_id IS NULL THEN
+            SELECT id INTO v_user_id
+              FROM auth.users
+             WHERE email = v_app.email
+             LIMIT 1;
+        END IF;
+
+        IF v_user_id IS NOT NULL THEN
+            INSERT INTO public.vendors (
+                id,
+                business_name,
+                contact_name,
+                email,
+                phone,
+                address,
+                campus_proximity,
+                status
+            )
+            VALUES (
+                v_user_id,
+                v_app.business_name,
+                v_app.contact_name,
+                v_app.email,
+                v_app.phone,
+                v_app.address,
+                v_app.campus_proximity,
+                'approved'
+            )
+            ON CONFLICT (id) DO UPDATE
+            SET business_name = EXCLUDED.business_name,
+                contact_name = EXCLUDED.contact_name,
+                email = EXCLUDED.email,
+                phone = EXCLUDED.phone,
+                address = EXCLUDED.address,
+                campus_proximity = EXCLUDED.campus_proximity,
+                status = 'approved';
+        END IF;
+    END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.review_student_kyc_application(uuid, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.review_vendor_application(uuid, text, text) TO anon, authenticated;
+
+
+

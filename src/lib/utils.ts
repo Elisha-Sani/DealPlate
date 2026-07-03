@@ -66,6 +66,8 @@ export function mapSupabaseDeal(d: Record<string, unknown>) {
     briefDescription: d.brief_description as string | undefined,
     detailedDescription: d.detailed_description as string | undefined,
     stockCount: d.stock_count as number,
+    isPublished: d.is_published !== false,
     durationRemaining: (d.duration_remaining as string) || '00:00:00',
   };
 }
+
