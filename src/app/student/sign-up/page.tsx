@@ -1,75 +1,297 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'motion/react';
-import { useRouter } from 'next/navigation';
-import { ShieldAlert } from 'lucide-react';
-import type { SignUpFormData } from '@/types';
+import { useState, useCallback, useId } from "react";
+import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
+import { ShieldAlert, Eye, EyeOff, Loader2 } from "lucide-react";
+import type { SignUpFormData } from "@/types";
+import { supabase } from "@/lib/supabase/client";
+
+type FieldErrors = Partial<Record<keyof SignUpFormData, string>>;
+
+const KENYA_PHONE_RE = /^(?:\+254|0)7\d{8}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.(edu|ac\.[a-z]{2})$/i;
+
+function validate(form: SignUpFormData): FieldErrors {
+    const errors: FieldErrors = {};
+
+    if (!form.fullName.trim()) {
+        errors.fullName = "Enter your full name.";
+    } else if (form.fullName.trim().length < 2) {
+        errors.fullName = "Name looks too short.";
+    }
+
+    if (!form.phone.trim()) {
+        errors.phone = "Enter your M-Pesa number.";
+    } else if (!KENYA_PHONE_RE.test(form.phone.replace(/\s/g, ""))) {
+        errors.phone = "Use a valid number, e.g. +254 7XX XXX XXX.";
+    }
+
+    if (!form.email.trim()) {
+        errors.email = "Enter your university email.";
+    } else if (!EMAIL_RE.test(form.email.trim())) {
+        errors.email = "Use your .edu or .ac university address.";
+    }
+
+    if (!form.password) {
+        errors.password = "Create a password.";
+    } else if (form.password.length < 8) {
+        errors.password = "Use at least 8 characters.";
+    }
+
+    return errors;
+}
+
+const inputClasses = (hasError: boolean) =>
+    `w-full h-12 rounded-lg border bg-white px-4 text-sm outline-none transition-all focus:ring-2 ${
+        hasError
+            ? "border-red-300 focus:ring-red-400"
+            : "border-gray-200 focus:ring-[#FF6B00]"
+    }`;
+
+interface FieldProps {
+    id: string;
+    label: string;
+    type: string;
+    placeholder: string;
+    value: string;
+    error?: string;
+    autoComplete?: string;
+    endAdornment?: React.ReactNode;
+    onChange: (value: string) => void;
+}
+
+function Field({
+    id,
+    label,
+    type,
+    placeholder,
+    value,
+    error,
+    autoComplete,
+    endAdornment,
+    onChange,
+}: FieldProps) {
+    const errorId = `${id}-error`;
+    return (
+        <div>
+            <label
+                htmlFor={id}
+                className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-1.5 ml-2"
+            >
+                {label}
+            </label>
+            <div className="relative">
+                <input
+                    id={id}
+                    type={type}
+                    placeholder={placeholder}
+                    value={value}
+                    autoComplete={autoComplete}
+                    aria-invalid={!!error}
+                    aria-describedby={error ? errorId : undefined}
+                    onChange={(e) => onChange(e.target.value)}
+                    className={`${inputClasses(!!error)} ${endAdornment ? "pr-11" : ""}`}
+                />
+                {endAdornment}
+            </div>
+            {error && (
+                <p
+                    id={errorId}
+                    className="mt-1 ml-2 text-xs font-semibold text-red-600"
+                >
+                    {error}
+                </p>
+            )}
+        </div>
+    );
+}
 
 export default function StudentSignUp() {
-  const router = useRouter();
-  const [form, setForm] = useState<SignUpFormData>({ fullName: '', phone: '', email: '', password: '' });
-  const [error, setError] = useState('');
+    const router = useRouter();
+    const formIdBase = useId();
+    const [form, setForm] = useState<SignUpFormData>({
+        fullName: "",
+        phone: "",
+        email: "",
+        password: "",
+    });
+    const [errors, setErrors] = useState<FieldErrors>({});
+    const [showPassword, setShowPassword] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.fullName || !form.phone || !form.email || !form.password) {
-      setError('Please fill in all details to snag deals.');
-      return;
-    }
-    setError('');
-    router.push('/student/verify');
-  };
+    const updateField = useCallback(
+        (key: keyof SignUpFormData, value: string) => {
+            setForm((prev) => ({ ...prev, [key]: value }));
+            setErrors((prev) =>
+                prev[key] ? { ...prev, [key]: undefined } : prev,
+            );
+        },
+        [],
+    );
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: 15 }}
-      animate={{ opacity: 1, x: 0 }}
-      className="max-w-[420px] w-full mx-auto py-6"
-    >
-      <div className="text-center mb-8">
-        <h2 className="font-display font-extrabold text-3xl tracking-tight text-[#111827] mb-2">
-          Join DealPlate
-        </h2>
-        <p className="text-[#5a4136] text-sm">Get exclusive student flash deals on local meals.</p>
-      </div>
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-      <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md">
-        {error && (
-          <div className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-xs font-semibold flex items-center gap-2">
-            <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        const fieldErrors = validate(form);
+        setErrors(fieldErrors);
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-1.5 ml-2">Full Name</label>
-            <input type="text" placeholder="Jane Doe" value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} className="w-full h-12 rounded-lg border border-gray-200 bg-white px-4 text-sm focus:ring-2 focus:ring-[#FF6B00] outline-none transition-all" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-1.5 ml-2">Phone Number (M-Pesa)</label>
-            <input type="tel" placeholder="+254 7XX XXX XXX" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="w-full h-12 rounded-lg border border-gray-200 bg-white px-4 text-sm focus:ring-2 focus:ring-[#FF6B00] outline-none transition-all" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-1.5 ml-2">University Email</label>
-            <input type="email" placeholder="student@university.edu" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full h-12 rounded-lg border border-gray-200 bg-white px-4 text-sm focus:ring-2 focus:ring-[#FF6B00] outline-none transition-all" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-1.5 ml-2">Password</label>
-            <input type="password" placeholder="••••••••" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full h-12 rounded-lg border border-gray-200 bg-white px-4 text-sm focus:ring-2 focus:ring-[#FF6B00] outline-none transition-all" />
-          </div>
-          <button type="submit" className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 mt-4">
-            <span>Next: Verify Student Status</span>
-          </button>
-        </form>
-      </div>
+        if (Object.keys(fieldErrors).length > 0) {
+            setSubmitError("Please fix the highlighted fields.");
+            return;
+        }
 
-      <div className="mt-6 text-center">
-        <button onClick={() => router.push('/student/sign-in')} className="text-xs font-bold text-[#FF6B00] hover:underline">
-          Already have an account? Sign In
-        </button>
-      </div>
-    </motion.div>
-  );
+        setSubmitError("");
+        setIsSubmitting(true);
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: form.email,
+                password: form.password,
+                options: {
+                    data: {
+                        full_name: form.fullName,
+                        phone: form.phone,
+                    }
+                }
+            });
+
+            if (error) {
+                setSubmitError(error.message);
+                setIsSubmitting(false);
+                return;
+            }
+
+            if (data.user) {
+                const { error: profileError } = await supabase.from('student_profiles').insert({
+                    id: data.user.id,
+                    full_name: form.fullName,
+                    phone: form.phone,
+                    university: '',
+                    reg_number: ''
+                });
+
+                if (profileError) {
+                    setSubmitError("Account created, but failed to setup profile. Please contact support.");
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            router.push("/student/verify");
+        } catch {
+            setSubmitError("Something went wrong. Please try again.");
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="max-w-105 w-full mx-auto py-6"
+        >
+            <div className="text-center mb-8">
+                <h2 className="font-display font-extrabold text-3xl tracking-tight text-[#111827] mb-2">
+                    Join DealPlate
+                </h2>
+                <p className="text-[#5a4136] text-sm">
+                    Get exclusive student flash deals on local meals.
+                </p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md">
+                {submitError && (
+                    <div
+                        role="alert"
+                        className="mb-4 bg-red-50 text-red-600 p-3 rounded-lg text-xs font-semibold flex items-center gap-2"
+                    >
+                        <ShieldAlert className="w-4 h-4 shrink-0" />
+                        <span>{submitError}</span>
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                    <Field
+                        id={`${formIdBase}-fullName`}
+                        label="Full Name"
+                        type="text"
+                        placeholder="John Kamau"
+                        value={form.fullName}
+                        error={errors.fullName}
+                        autoComplete="name"
+                        onChange={(v) => updateField("fullName", v)}
+                    />
+                    <Field
+                        id={`${formIdBase}-phone`}
+                        label="Phone Number (M-Pesa)"
+                        type="tel"
+                        placeholder="+254 7XX XXX XXX"
+                        value={form.phone}
+                        error={errors.phone}
+                        autoComplete="tel"
+                        onChange={(v) => updateField("phone", v)}
+                    />
+                    <Field
+                        id={`${formIdBase}-email`}
+                        label="University Email"
+                        type="email"
+                        placeholder="student@university.edu"
+                        value={form.email}
+                        error={errors.email}
+                        autoComplete="email"
+                        onChange={(v) => updateField("email", v)}
+                    />
+                    <Field
+                        id={`${formIdBase}-password`}
+                        label="Password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={form.password}
+                        error={errors.password}
+                        autoComplete="new-password"
+                        onChange={(v) => updateField("password", v)}
+                        endAdornment={
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((s) => !s)}
+                                aria-label={
+                                    showPassword
+                                        ? "Hide password"
+                                        : "Show password"
+                                }
+                                className="absolute inset-y-0 right-0 flex items-center px-3 text-[#5a4136]"
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="w-4 h-4" />
+                                ) : (
+                                    <Eye className="w-4 h-4" />
+                                )}
+                            </button>
+                        }
+                    />
+                    <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md flex items-center justify-center gap-2 mt-4 disabled:opacity-60 disabled:active:scale-100"
+                    >
+                        {isSubmitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <span>Next: Verify Student Status</span>
+                        )}
+                    </button>
+                </form>
+            </div>
+
+            <div className="mt-6 text-center">
+                <button
+                    onClick={() => router.push("/student/sign-in")}
+                    className="text-xs font-bold text-[#FF6B00] hover:underline"
+                >
+                    Already have an account? Sign In
+                </button>
+            </div>
+        </motion.div>
+    );
 }

@@ -11,7 +11,7 @@ if (supabaseUrl === 'https://placeholder.supabase.co') {
 
 export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
   auth: {
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
     persistSession: typeof window !== 'undefined',
   }
 });
