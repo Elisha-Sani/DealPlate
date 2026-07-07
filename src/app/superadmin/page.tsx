@@ -106,8 +106,8 @@ export default function SuperadminDashboard() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/superadmin'
-      }
+        redirectTo: `${window.location.origin}/auth/callback?next=/superadmin`,
+      },
     });
     if (error) {
       setMessage(error.message);
