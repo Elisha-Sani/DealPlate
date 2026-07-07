@@ -162,21 +162,8 @@ export default function StudentSignUp() {
                 return;
             }
 
-            if (data.user) {
-                const { error: profileError } = await supabase.from('student_profiles').insert({
-                    id: data.user.id,
-                    full_name: form.fullName,
-                    phone: form.phone,
-                    university: '',
-                    reg_number: ''
-                });
-
-                if (profileError) {
-                    setSubmitError("Account created, but failed to setup profile. Please contact support.");
-                    setIsSubmitting(false);
-                    return;
-                }
-            }
+            // The database trigger 'handle_new_student_user' will automatically 
+            // create the student_profiles row using the options.data we provided above.
 
             router.push("/student/verify");
         } catch {
