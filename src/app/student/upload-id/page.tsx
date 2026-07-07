@@ -67,8 +67,8 @@ export default function StudentUploadId() {
             return;
         }
         if (
-            studentIdFile.size > 5_000_000 ||
-            universityDocFile.size > 5_000_000
+            studentIdFile.size > 2_000_000 ||
+            universityDocFile.size > 2_000_000
         ) {
             setError("Each file must be under 5MB.");
             return;
