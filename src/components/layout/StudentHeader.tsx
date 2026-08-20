@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Compass, ReceiptText, User, UserCheck } from "lucide-react";
+import { ArrowLeft, Compass, Heart, ReceiptText, User, UserCheck } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/providers/UserProvider";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export default function StudentHeader() {
 
     const navItems = [
         { path: "/student/explore", icon: Compass, label: "Explore" },
+        { path: "/student/saved", icon: Heart, label: "Saved" },
         { path: "/student/orders", icon: ReceiptText, label: "Orders" },
         { path: "/student/profile", icon: User, label: "Profile" },
     ] as const;
@@ -66,6 +67,16 @@ export default function StudentHeader() {
                             <UserCheck className="w-3.5 h-3.5" />
                             <span>Verified student</span>
                         </div>
+                    )}
+
+                    {!user && !isAuthPage && (
+                        <button
+                            type="button"
+                            onClick={() => router.push(`/student/sign-in?next=${encodeURIComponent(pathname)}`)}
+                            className="h-9 px-4 rounded-full bg-[#FF6B00] text-white text-xs font-bold hover:bg-[#e66000] transition-colors shrink-0"
+                        >
+                            Sign In
+                        </button>
                     )}
                 </div>
             </div>

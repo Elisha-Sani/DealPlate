@@ -37,28 +37,24 @@ export default function VendorPickup() {
     setError('');
 
     try {
-      // Find the active order with this pickup code
-      const { data: order, error: fetchError } = await supabase
+      // Single atomic UPDATE guarded by status='Active' — avoids the
+      // fetch-then-update race where two terminals could both confirm the
+      // same code between the read and the write.
+      const { data: updated, error: updateError } = await supabase
         .from('orders')
-        .select('*')
+        .update({ status: 'Completed' })
         .eq('pickup_code', code)
         .eq('status', 'Active')
-        .maybeSingle();
+        .select('id');
 
-      if (fetchError || !order) {
-        setError('Failed: Invalid or already completed pickup code.');
+      if (updateError) {
+        setError('Failed to update order status.');
         setLoading(false);
         return;
       }
 
-      // Update order to Completed
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({ status: 'Completed' })
-        .eq('id', order.id);
-
-      if (updateError) {
-        setError('Failed to update order status.');
+      if (!updated || updated.length === 0) {
+        setError('Failed: Invalid or already completed pickup code.');
         setLoading(false);
         return;
       }

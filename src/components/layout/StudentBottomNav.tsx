@@ -1,6 +1,6 @@
 'use client';
 
-import { Compass, ReceiptText, User } from 'lucide-react';
+import { Compass, Heart, ReceiptText, User } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ export default function StudentBottomNav() {
 
   const navItems = [
     { path: '/student/explore', icon: Compass, label: 'Explore' },
+    { path: '/student/saved', icon: Heart, label: 'Saved' },
     { path: '/student/orders', icon: ReceiptText, label: 'Orders' },
     { path: '/student/profile', icon: User, label: 'Profile' },
   ] as const;

@@ -4,8 +4,16 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Deal, Order } from '@/types';
 import { supabase } from '@/lib/supabase/client';
 import { useUser } from '@/providers/UserProvider';
-import { SERVICE_FEE, PICKUP_WINDOW_SECONDS } from '@/lib/constants';
-import { generatePickupCode } from '@/lib/utils';
+import { PICKUP_WINDOW_SECONDS } from '@/lib/constants';
+
+interface OrderRow {
+  id: string;
+  order_date: string;
+  order_time: string;
+  status: string;
+  total_paid: number;
+  pickup_code: string;
+}
 
 interface UseOrdersReturn {
   pastOrders: Order[];
@@ -93,24 +101,21 @@ export function useOrders(): UseOrdersReturn {
       if (!user?.id) return null;
       
       const now = new Date();
-      const newOrderPayload = {
-        user_id: user.id,
-        deal_id: deal.id,
-        order_date: now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        order_time: now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-        status: 'Active',
-        total_paid: deal.dealPrice + SERVICE_FEE,
-        pickup_code: generatePickupCode(),
-      };
+      const orderDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const orderTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 
-      const { data, error } = await supabase.from('orders').insert(newOrderPayload).select().single();
-      
+      // Atomic RPC: locks the deal row, checks stock under lock, recomputes
+      // price server-side, decrements stock, and inserts the order in one
+      // transaction — avoids overselling and client-tampered prices.
+      const { data, error } = await supabase
+        .rpc('create_order_with_stock_check', {
+          p_deal_id: deal.id,
+          p_order_date: orderDate,
+          p_order_time: orderTime,
+        })
+        .single<OrderRow>();
+
       if (!error && data) {
-        // decrement_stock is skipped here if no RPC exists, wait, we'll let it fail silently if it doesn't exist,
-        // or we can remove the RPC call. For prototype, it's fine.
-        const { error: rpcError } = await supabase.rpc('decrement_stock', { p_deal_id: deal.id });
-        if (rpcError) console.error("Failed to decrement stock:", rpcError);
-
         const order: Order = {
           id: data.id,
           deal,
@@ -124,6 +129,7 @@ export function useOrders(): UseOrdersReturn {
         setTicketSeconds(PICKUP_WINDOW_SECONDS);
         return order;
       }
+      if (error) console.error('Failed to create order:', error.message);
       return null;
     },
     [user?.id]

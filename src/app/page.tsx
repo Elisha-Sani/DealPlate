@@ -61,7 +61,7 @@ export default function LandingPage() {
 
                     <div className="flex flex-col gap-4">
                         <button
-                            onClick={() => router.push("/student/sign-in")}
+                            onClick={() => router.push("/student/explore")}
                             className="group relative flex items-center p-6 bg-white border-2 border-[#FF6B00]/10 hover:border-[#FF6B00] rounded-2xl transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
                         >
                             <div className="w-12 h-12 bg-orange-50 text-[#FF6B00] rounded-xl flex items-center justify-center mr-4 group-hover:bg-[#FF6B00] group-hover:text-white transition-colors">

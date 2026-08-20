@@ -13,6 +13,25 @@ export default function VendorSignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Enter your business email above first, then click "Forgot password?".');
+      return;
+    }
+    setIsResetting(true);
+    setError(null);
+    setResetMessage(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    });
+    setIsResetting(false);
+    setResetMessage(
+      error ? error.message : 'If an account exists for that email, a reset link has been sent.'
+    );
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +46,11 @@ export default function VendorSignIn() {
     if (error) {
       setError(error.message);
       setIsLoading(false);
+    } else if (window.location.pathname !== '/vendor/sign-in') {
+      // Served via middleware's masked rewrite while trying to reach some
+      // other vendor page — the address bar already shows it, so refresh
+      // in place instead of hardcoding a destination.
+      router.refresh();
     } else {
       router.push('/vendor/dashboard');
     }
@@ -63,6 +87,11 @@ export default function VendorSignIn() {
                 {error}
               </div>
             )}
+            {resetMessage && (
+              <div className="p-3 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
+                {resetMessage}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Business Email</label>
               <div className="relative">
@@ -80,7 +109,14 @@ export default function VendorSignIn() {
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="block text-sm font-medium text-[#1E293B]">Password</label>
-                <button type="button" className="text-sm text-[#FF6B00] hover:underline">Forgot password?</button>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isResetting}
+                  className="text-sm text-[#FF6B00] hover:underline disabled:opacity-60"
+                >
+                  {isResetting ? 'Sending...' : 'Forgot password?'}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />

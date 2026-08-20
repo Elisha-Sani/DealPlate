@@ -21,10 +21,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        fetchStudentProfile(session.user.id, session.user.email || '');
+    // Use getUser() (not getSession()) here — it revalidates against the
+    // Supabase Auth server instead of trusting the locally stored session.
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        fetchStudentProfile(user.id, user.email || '');
       }
     });
 

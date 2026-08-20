@@ -37,36 +37,69 @@ export async function updateSession(request: NextRequest) {
 
   // Get the user's role from app_metadata (set by server), defaulting to 'student' if none.
   const role = user?.app_metadata?.role || 'student'
+  const accountStatus = user?.app_metadata?.account_status || 'active'
 
   const path = request.nextUrl.pathname
+
+  // Student routes that require a signed-in account. Browsing (explore, deal
+  // detail pages) is open to guests — only checking out, viewing orders, or
+  // touching KYC/profile data requires auth.
+  const STUDENT_AUTH_REQUIRED_PREFIXES = [
+    '/student/checkout',
+    '/student/orders',
+    '/student/profile',
+    '/student/saved',
+    '/student/upload-id',
+    '/student/verify',
+    '/student/order-confirmed',
+  ]
 
   // Protected routes pattern
   const isSuperadminRoute = path.startsWith('/superadmin')
   const isVendorRoute = path.startsWith('/vendor') && !path.startsWith('/vendor/sign-in') && !path.startsWith('/vendor/apply')
-  const isStudentRoute = path.startsWith('/student') && !path.startsWith('/student/sign-in') && !path.startsWith('/student/sign-up')
+  const isStudentRoute = STUDENT_AUTH_REQUIRED_PREFIXES.some((prefix) => path.startsWith(prefix))
 
-  // If no user, redirect them to the appropriate login page based on the route they tried to access
+  // If no user, serve the sign-in page for the route they tried to access —
+  // via rewrite, not redirect, so the address bar still shows the page they
+  // were trying to reach instead of exposing "/student/sign-in" and leaking
+  // that the page is gated. No ?next= is needed here: since the URL never
+  // actually changes, the sign-in page just does a router.refresh() on
+  // success and middleware re-evaluates the (now authenticated) request
+  // against the same, unchanged URL.
   if (!user && (isSuperadminRoute || isVendorRoute || isStudentRoute)) {
     // If they hit /superadmin without being logged in, redirect to home (since login is on /superadmin)
     // Wait, superadmin login IS /superadmin. So we should NOT redirect if path === '/superadmin'.
     if (path === '/superadmin') {
       return supabaseResponse
     }
-    
+
     if (isVendorRoute) {
       const url = request.nextUrl.clone()
       url.pathname = '/vendor/sign-in'
-      return NextResponse.redirect(url)
+      return NextResponse.rewrite(url)
     }
 
-    // Default redirect for students
     const url = request.nextUrl.clone()
     url.pathname = '/student/sign-in'
-    return NextResponse.redirect(url)
+    return NextResponse.rewrite(url)
   }
 
   // Enforce role boundaries for logged-in users
   if (user) {
+    if (accountStatus === 'revoked') {
+      // Clear their session entirely or redirect to a specific revoked page.
+      // For now, redirecting to login will force them to see they can't access things,
+      // and they'll be blocked from logging in successfully if we handle it at login.
+      // Alternatively, we just redirect them to a generic access-denied or sign-in page.
+      const url = request.nextUrl.clone()
+      url.pathname = role === 'vendor' ? '/vendor/sign-in' : role === 'superadmin' ? '/superadmin' : '/student/sign-in'
+
+      // We must avoid infinite loops if they are already on the sign-in page
+      if (path !== url.pathname) {
+        return NextResponse.redirect(url)
+      }
+    }
+
     if (isSuperadminRoute && role !== 'superadmin') {
       const url = request.nextUrl.clone()
       url.pathname = '/'

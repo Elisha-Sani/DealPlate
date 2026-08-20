@@ -140,13 +140,20 @@ export default function VendorInventory() {
         const {
             data: { session },
         } = await supabase.auth.getSession();
-        let vendorQuery = supabase.from("vendors").select("id, business_name");
-        vendorQuery = session?.user?.id
-            ? vendorQuery.eq("id", session.user.id)
-            : vendorQuery.limit(1);
 
-        const { data: vendorData, error: vendorError } =
-            await vendorQuery.maybeSingle();
+        if (!session?.user?.id) {
+            setVendor(null);
+            setItems([]);
+            setIsLoading(false);
+            setMessage("You must be signed in as a vendor to manage inventory.");
+            return;
+        }
+
+        const { data: vendorData, error: vendorError } = await supabase
+            .from("vendors")
+            .select("id, business_name")
+            .eq("id", session.user.id)
+            .maybeSingle();
         if (vendorError || !vendorData) {
             setVendor(null);
             setItems([]);

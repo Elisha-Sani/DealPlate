@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 interface TimerProps {
   initialSeconds: number;
   onExpire?: () => void;
-  variant?: 'badge' | 'box';
+  variant?: 'badge' | 'box' | 'inline';
   className?: string;
 }
 
@@ -18,6 +18,14 @@ export default function Timer({
   className = '',
 }: TimerProps) {
   const { formatted } = useCountdown(initialSeconds, onExpire);
+
+  if (variant === 'inline') {
+    return (
+      <span className={cn('font-bold text-[#111827] tabular-nums', className)}>
+        {formatted}
+      </span>
+    );
+  }
 
   if (variant === 'box') {
     return (

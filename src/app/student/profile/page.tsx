@@ -26,36 +26,51 @@ export default function StudentProfile() {
     router.push('/student/sign-in');
   };
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user.id) return;
 
-    if (file.size > 1_000_000) {
-      setAvatarStatus('Use an image under 1MB.');
+    if (file.size > 2_000_000) {
+      setAvatarStatus('Use an image under 2MB.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const dataUrl = reader.result as string;
-      setAvatarPreview(dataUrl);
-      setAvatarStatus('Saving photo...');
+    setAvatarStatus('Saving photo...');
+    try {
+      // 1. Upload to storage
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
 
-      const { error } = await supabase
-        .from('student_profiles')
-        .update({ id_photo_url: dataUrl })
-        .eq('id', user.id);
-
-      if (error) {
-        setAvatarStatus('Photo could not be saved.');
-        setAvatarPreview(user.avatar);
-        return;
+      if (uploadError) {
+        throw uploadError;
       }
 
-      setUser((prev) => prev ? { ...prev, avatar: dataUrl } : prev);
+      // 2. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(uploadData.path);
+
+      // 3. Update DB
+      const { error: dbError } = await supabase
+        .from('student_profiles')
+        .update({ id_photo_url: publicUrl })
+        .eq('id', user.id);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      setAvatarPreview(publicUrl);
+      setUser((prev) => prev ? { ...prev, avatar: publicUrl } : prev);
       setAvatarStatus('Photo saved.');
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+      console.error(error);
+      setAvatarStatus('Photo could not be saved.');
+    }
   };
 
   return (

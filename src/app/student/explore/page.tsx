@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Search, MapPin, X } from 'lucide-react';
 import { useDeals } from '@/hooks/useDeals';
 import { useOrders } from '@/hooks/useOrders';
-import { useUser } from '@/providers/UserProvider';
 import { useCart } from '@/providers/CartProvider';
 import Price from '@/components/ui/Price';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -16,15 +15,10 @@ import type { Deal } from '@/types';
 
 export default function StudentExplore() {
   const router = useRouter();
-  const { user } = useUser();
   const { setCartDeal } = useCart();
   const { pastOrders } = useOrders();
   const { filteredDeals, isLoading, searchQuery, setSearchQuery, selectedCampus, setSelectedCampus } = useDeals();
   const [layout, setLayout] = useState<'grid' | 'masonry'>('grid');
-
-  if (!user) {
-    return null;
-  }
 
   const handleSelectDeal = (deal: Deal) => {
     router.push(`/student/deals/${deal.id}`);

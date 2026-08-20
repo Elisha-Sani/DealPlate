@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseCountdownReturn {
   seconds: number;
@@ -11,23 +11,35 @@ interface UseCountdownReturn {
 
 export function useCountdown(initialSeconds: number, onExpire?: () => void): UseCountdownReturn {
   const [seconds, setSeconds] = useState(initialSeconds);
+  const onExpireRef = useRef(onExpire);
+  onExpireRef.current = onExpire;
 
   useEffect(() => {
     setSeconds(initialSeconds);
   }, [initialSeconds]);
 
+  // A single interval ticking for the lifetime of a countdown, instead of
+  // being torn down and recreated every second (which drifts under tab
+  // throttling since each recreation restarts the 1000ms timer from zero).
   useEffect(() => {
-    if (seconds <= 0) {
-      onExpire?.();
+    if (initialSeconds <= 0) {
+      onExpireRef.current?.();
       return;
     }
 
     const interval = setInterval(() => {
-      setSeconds((prev) => prev - 1);
+      setSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          if (prev > 0) onExpireRef.current?.();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [seconds, onExpire]);
+  }, [initialSeconds]);
 
   const formatTime = (totalSeconds: number): string => {
     const hrs = Math.floor(totalSeconds / 3600);

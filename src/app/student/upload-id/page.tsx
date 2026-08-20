@@ -14,6 +14,7 @@ import StepIndicator from "@/components/ui/StepIndicator";
 import { useUser } from "@/providers/UserProvider";
 import { supabase } from "@/lib/supabase/client";
 import { validateStudentKyc } from "@/app/actions/validateStudentKyc";
+import { submitStudentKyc } from "@/app/actions/submitStudentKyc";
 
 interface AcademicDetails {
     university: string;
@@ -53,7 +54,7 @@ export default function StudentUploadId() {
         if (!user) router.push("/student/sign-in");
     }, [router, user]);
 
-    const handleSubmit = async () => {
+  const handleSubmit = async () => {
         if (!user?.id) return;
         if (!details) {
             setError("Start with your academic details first.");
@@ -66,80 +67,37 @@ export default function StudentUploadId() {
             );
             return;
         }
+
+        // We still do basic client-side check for user experience
         if (
-            studentIdFile.size > 2_000_000 ||
-            universityDocFile.size > 2_000_000
+            studentIdFile.size > 5_000_000 ||
+            universityDocFile.size > 5_000_000
         ) {
             setError("Each file must be under 5MB.");
             return;
         }
 
         setError("");
-        setStatus("Preparing documents...");
+        setStatus("Submitting documents securely...");
         setIsSubmitting(true);
 
         try {
-            const studentIdDataUrl = await readFileAsDataUrl(studentIdFile);
-            const universityDocDataUrl =
-                await readFileAsDataUrl(universityDocFile);
+            const formData = new FormData();
+            formData.append('studentId', user.id);
+            formData.append('fullName', user.fullName);
+            formData.append('email', user.email);
+            formData.append('phone', user.phone || '');
+            formData.append('university', details.university);
+            formData.append('regNumber', details.regNumber);
+            formData.append('documentDate', documentDate);
+            formData.append('studentIdFile', studentIdFile);
+            formData.append('universityDocFile', universityDocFile);
 
-            setStatus("Running AI document checks...");
-            const aiReview = await validateStudentKyc({
-                fullName: user.fullName,
-                university: details.university,
-                regNumber: details.regNumber,
-                documentDate,
-                documents: [
-                    {
-                        label: "student_id",
-                        fileName: studentIdFile.name,
-                        mimeType: studentIdFile.type,
-                        dataUrl: studentIdDataUrl,
-                    },
-                    {
-                        label: "university_document",
-                        fileName: universityDocFile.name,
-                        mimeType: universityDocFile.type,
-                        dataUrl: universityDocDataUrl,
-                    },
-                ],
-            });
+            const result = await submitStudentKyc(formData);
 
-            setStatus("Submitting KYC application...");
-            await supabase
-                .from("student_profiles")
-                .update({
-                    university: details.university,
-                    reg_number: details.regNumber,
-                    is_verified: false,
-                    id_photo_url: studentIdDataUrl,
-                })
-                .eq("id", user.id);
-
-            const { error: insertError } = await supabase
-                .from("student_kyc_applications")
-                .insert({
-                    student_id: user.id,
-                    full_name: user.fullName,
-                    email: user.email,
-                    phone: user.phone,
-                    university: details.university,
-                    reg_number: details.regNumber,
-                    student_id_file_name: studentIdFile.name,
-                    university_doc_file_name: universityDocFile.name,
-                    university_doc_date: documentDate,
-                    document_data: {
-                        studentId: studentIdDataUrl,
-                        universityDocument: universityDocDataUrl,
-                    },
-                    ai_recommendation: aiReview.recommendation,
-                    ai_confidence: aiReview.confidence,
-                    ai_summary: aiReview.summary,
-                    ai_flags: aiReview.flags,
-                    status: "pending_review",
-                });
-
-            if (insertError) throw insertError;
+            if (!result.success) {
+                throw new Error(result.error);
+            }
 
             setUser((prev) =>
                 prev
@@ -148,7 +106,6 @@ export default function StudentUploadId() {
                           university: details.university,
                           regNumber: details.regNumber,
                           isVerified: false,
-                          avatar: studentIdDataUrl,
                       }
                     : prev,
             );

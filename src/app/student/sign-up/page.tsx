@@ -162,7 +162,18 @@ export default function StudentSignUp() {
                 return;
             }
 
-            // The database trigger 'handle_new_student_user' will automatically 
+            // Supabase returns a 200 with a user that has an empty
+            // `identities` array (instead of an error) when the email is
+            // already registered, to avoid leaking account existence.
+            if (data.user && data.user.identities?.length === 0) {
+                setSubmitError(
+                    "An account with this email already exists. Try signing in instead."
+                );
+                setIsSubmitting(false);
+                return;
+            }
+
+            // The database trigger 'handle_new_student_user' will automatically
             // create the student_profiles row using the options.data we provided above.
 
             router.push("/student/verify");

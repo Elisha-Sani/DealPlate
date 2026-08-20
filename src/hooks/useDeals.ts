@@ -25,7 +25,14 @@ export function useDeals(): UseDealsReturn {
     const fetchDeals = async () => {
       try {
         setIsLoading(true);
-        const { data, error } = await supabase.from('deals').select('*');
+        // Filter server-side instead of fetching every deal and discarding
+        // unpublished/sold-out rows client-side — smaller payload, faster load.
+        const { data, error } = await supabase
+          .from('deals')
+          .select('*')
+          .eq('is_published', true)
+          .gt('stock_count', 0)
+          .order('created_at', { ascending: false });
         if (error) {
           console.error('Error fetching deals:', error);
           setDeals([]);

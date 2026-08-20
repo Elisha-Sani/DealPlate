@@ -1,18 +1,57 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { motion } from 'motion/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
+// Only allow same-origin, relative redirect targets — mirrors the guard in
+// auth/callback/route.ts to prevent an open redirect via ?next=. Returns
+// null when there's no (valid) next param, e.g. when this page was served
+// via middleware's masked rewrite rather than an explicit navigation.
+function sanitizeNext(next: string | null): string | null {
+  if (!next || !next.startsWith('/') || next.startsWith('//')) {
+    return null;
+  }
+  return next;
+}
+
 export default function StudentSignIn() {
+  return (
+    <Suspense fallback={null}>
+      <StudentSignInForm />
+    </Suspense>
+  );
+}
+
+function StudentSignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Enter your email address above first, then click "Forgot?".');
+      return;
+    }
+    setIsResetting(true);
+    setError(null);
+    setResetMessage(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+    });
+    setIsResetting(false);
+    setResetMessage(
+      error ? error.message : 'If an account exists for that email, a reset link has been sent.'
+    );
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +67,17 @@ export default function StudentSignIn() {
       setError(error.message);
       setIsLoading(false);
     } else {
-      router.push('/student/explore');
+      const next = sanitizeNext(searchParams.get('next'));
+      if (next) {
+        // Real navigation to this page (e.g. the header's "Sign In" button) —
+        // send them where they were headed.
+        router.push(next);
+      } else {
+        // Served via middleware's masked rewrite: the address bar already
+        // shows the page the user wanted. Refresh so middleware re-evaluates
+        // this now-authenticated request against that same URL.
+        router.refresh();
+      }
     }
   };
 
@@ -56,6 +105,11 @@ export default function StudentSignIn() {
             {error}
           </div>
         )}
+        {resetMessage && (
+          <div className="p-3 rounded-lg bg-blue-50 text-blue-700 text-sm font-medium border border-blue-100">
+            {resetMessage}
+          </div>
+        )}
         <div>
           <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider mb-2 ml-2">
             Email Address
@@ -75,8 +129,13 @@ export default function StudentSignIn() {
             <label className="block text-xs font-bold text-[#5a4136] uppercase tracking-wider ml-2">
               Password
             </label>
-            <button type="button" className="text-xs text-[#E11D48] font-bold hover:underline">
-              Forgot?
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={isResetting}
+              className="text-xs text-[#E11D48] font-bold hover:underline disabled:opacity-60"
+            >
+              {isResetting ? 'Sending...' : 'Forgot?'}
             </button>
           </div>
           <div className="relative">

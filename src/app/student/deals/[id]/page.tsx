@@ -4,65 +4,100 @@ import { use, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Heart, Share2, Store, Clock, MapPin, ShoppingBag } from 'lucide-react';
-import { useDeals } from '@/hooks/useDeals';
+import { supabase } from '@/lib/supabase/client';
 import { useCart } from '@/providers/CartProvider';
+import { useUser } from '@/providers/UserProvider';
+import { useSavedDeals } from '@/hooks/useSavedDeals';
 import Price from '@/components/ui/Price';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Timer from '@/components/ui/Timer';
-import { parseDurationToSeconds } from '@/lib/utils';
+import { cn, mapSupabaseDeal, parseDurationToSeconds } from '@/lib/utils';
+import type { Deal } from '@/types';
 
 export default function DealDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { deals } = useDeals();
   const { setCartDeal } = useCart();
+  const { user } = useUser();
+  const { isSaved, toggleSaved } = useSavedDeals();
+  const [deal, setDeal] = useState<Deal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
-  const deal = deals.find((d) => d.id === id);
-
-  // Artificial slight delay to ensure smooth transition from explore page
+  // Fetch this deal directly instead of loading the entire explore list
+  // again — faster, and works for direct/shared links too.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 400); // 400ms simulate network latency or layout compute
-    return () => clearTimeout(timer);
-  }, []);
+    let cancelled = false;
+    setIsLoading(true);
+    setNotFound(false);
 
-  if (isLoading || !deal) {
+    supabase
+      .from('deals')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          setNotFound(true);
+        } else {
+          setDeal(mapSupabaseDeal(data));
+        }
+        setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (isLoading) {
+    return <LoadingSpinner message="Loading deal..." />;
+  }
+
+  const handleToggleSaved = () => {
+    if (!user) {
+      router.push(`/student/sign-in?next=${encodeURIComponent(`/student/deals/${id}`)}`);
+      return;
+    }
+    toggleSaved(id);
+  };
+
+  const handleShare = async () => {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: deal?.title, url });
+      } catch {
+        // user cancelled the share sheet — no-op
+      }
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(url);
+      setShareFeedback('Link copied to clipboard');
+      setTimeout(() => setShareFeedback(null), 2000);
+    }
+  };
+
+  if (notFound || !deal) {
     return (
-      <div className="max-w-5xl w-full mx-auto flex flex-col gap-5 px-4 md:px-0">
-        <div className="flex justify-between items-center animate-pulse">
-          <div className="h-5 w-32 bg-gray-200 rounded-md"></div>
-          <div className="flex gap-2">
-            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
-          </div>
-        </div>
-        <div className="bg-white rounded-3xl border border-[#F3F4F6] overflow-hidden shadow-sm md:flex min-h-[600px] animate-pulse">
-          <div className="md:w-1/2 bg-gray-200 aspect-video md:aspect-auto"></div>
-          <div className="p-8 md:p-10 md:w-1/2 flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <div className="h-10 w-3/4 bg-gray-200 rounded-lg"></div>
-                <div className="h-5 w-1/3 bg-gray-200 rounded-md"></div>
-              </div>
-              <div className="flex gap-2">
-                <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
-                <div className="h-6 w-20 bg-gray-200 rounded-full"></div>
-              </div>
-              <div className="h-20 w-full bg-gray-200 rounded-xl"></div>
-              <div className="h-32 w-full bg-gray-200 rounded-xl"></div>
-            </div>
-            <div className="h-14 w-full bg-gray-200 rounded-xl mt-8"></div>
-          </div>
-        </div>
+      <div className="max-w-md w-full mx-auto flex flex-col items-center text-center gap-3 py-20">
+        <h2 className="font-display font-bold text-xl text-[#111827]">Deal not found</h2>
+        <p className="text-sm text-gray-500">This deal may have sold out or been removed.</p>
+        <button onClick={() => router.push('/student/explore')} className="mt-2 text-sm font-bold text-[#FF6B00] hover:underline">
+          Back to Explore
+        </button>
       </div>
     );
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
       className="max-w-5xl w-full mx-auto flex flex-col gap-5 px-4 md:px-0 pb-10"
     >
       {/* Back + actions */}
@@ -71,11 +106,23 @@ export default function DealDetailsPage({ params }: { params: Promise<{ id: stri
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Feed</span>
         </button>
-        <div className="flex gap-2">
-          <button className="w-10 h-10 bg-white border border-[#F3F4F6] rounded-full flex items-center justify-center text-gray-400 hover:text-[#E11D48] transition-colors shadow-sm">
-            <Heart className="w-5 h-5" />
+        <div className="flex items-center gap-2">
+          {shareFeedback && <span className="text-xs font-semibold text-gray-500">{shareFeedback}</span>}
+          <button
+            onClick={handleToggleSaved}
+            aria-label={isSaved(id) ? 'Remove from saved deals' : 'Save this deal'}
+            className={cn(
+              'w-10 h-10 bg-white border border-[#F3F4F6] rounded-full flex items-center justify-center transition-colors shadow-sm',
+              isSaved(id) ? 'text-[#E11D48]' : 'text-gray-400 hover:text-[#E11D48]'
+            )}
+          >
+            <Heart className="w-5 h-5" fill={isSaved(id) ? 'currentColor' : 'none'} />
           </button>
-          <button className="w-10 h-10 bg-white border border-[#F3F4F6] rounded-full flex items-center justify-center text-gray-400 hover:text-[#FF6B00] transition-colors shadow-sm">
+          <button
+            onClick={handleShare}
+            aria-label="Share this deal"
+            className="w-10 h-10 bg-white border border-[#F3F4F6] rounded-full flex items-center justify-center text-gray-400 hover:text-[#FF6B00] transition-colors shadow-sm"
+          >
             <Share2 className="w-5 h-5" />
           </button>
         </div>
@@ -120,17 +167,14 @@ export default function DealDetailsPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {/* Urgency */}
-            <div className="bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-inner mt-4">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-[#E11D48] animate-pulse shadow-[0_0_8px_rgba(225,29,72,0.6)]" />
-                <span className="text-sm font-black text-[#E11D48] uppercase tracking-wider">
-                  Only {deal.stockCount} left
-                </span>
-              </div>
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-[#E11D48]/5">
-                <Clock className="w-4 h-4 text-[#FF6B00]" />
-                <span className="text-xs font-bold text-[#5a4136] uppercase tracking-wider">Ends in:</span>
-                <Timer initialSeconds={parseDurationToSeconds(deal.durationRemaining)} />
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-y border-gray-100 mt-4">
+              <span className="text-sm font-semibold text-[#5a4136]">
+                Only <span className="font-bold text-[#111827]">{deal.stockCount}</span> left
+              </span>
+              <div className="flex items-center gap-1.5 text-sm text-[#5a4136]">
+                <Clock className="w-4 h-4 text-gray-400" />
+                <span className="font-semibold">Ends in</span>
+                <Timer initialSeconds={parseDurationToSeconds(deal.durationRemaining)} variant="inline" />
               </div>
             </div>
 
