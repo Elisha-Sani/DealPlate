@@ -9,7 +9,6 @@ import ActiveListingsTable from '@/components/vendor/ActiveListingsTable';
 import LiveFeed from '@/components/vendor/LiveFeed';
 import RevenueChart from '@/components/vendor/RevenueChart';
 import type { Deal, Order } from '@/types';
-import { Loader2 } from 'lucide-react';
 
 export default function VendorDashboard() {
   const [vendorName, setVendorName] = useState('Loading...');
@@ -44,7 +43,14 @@ export default function VendorDashboard() {
     const [{ data: vendorData }, { data: dealsData }, { data: ordersData }] = await Promise.all([
       supabase.from('vendors').select('id, business_name').eq('id', user.id).single(),
       supabase.from('deals').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('orders').select(`*, deal:deals(*), student:user_id(*)`).order('created_at', { ascending: false }),
+      supabase
+        .from('orders')
+        .select(
+          `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
+           deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, duration_remaining),
+           student:user_id(full_name, phone, university)`
+        )
+        .order('created_at', { ascending: false }),
     ]);
 
     if (!vendorData) {
@@ -79,9 +85,14 @@ export default function VendorDashboard() {
     }
 
     if (ordersData) {
-      // The RLS policy "Vendors can view orders for their deals" filters this automatically, 
+      // Supabase's select-string type inference can't tell deal:/student: are
+      // to-one relations here (no generated Database types configured), so
+      // it infers them as arrays — cast through `any`; the actual runtime
+      // shape is a single object per the foreign key.
+      const ordersDataTyped = ordersData as any[];
+      // The RLS policy "Vendors can view orders for their deals" filters this automatically,
       // but we ensure we only process valid ones.
-      const mappedOrders: Order[] = ordersData.filter(o => o.deal).map(o => ({
+      const mappedOrders: Order[] = ordersDataTyped.filter(o => o.deal).map(o => ({
         id: o.id,
         deal: {
           id: o.deal.id,
@@ -147,9 +158,34 @@ export default function VendorDashboard() {
 
   if (loading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
-        <Loader2 className="w-10 h-10 animate-spin text-[#FF6B00]" />
-        <p className="mt-4 text-gray-500 font-medium">Loading Dashboard Data...</p>
+      <div className="flex flex-col flex-1 pb-10">
+        <div className="h-20 bg-[#F9FAFB] border-b border-[#E2E8F0] flex items-center px-8 shrink-0">
+          <div className="h-7 w-48 rounded-md bg-gray-200 animate-pulse" />
+        </div>
+        <div className="p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
+                <div className="h-4 w-28 rounded bg-gray-200 animate-pulse" />
+                <div className="h-8 w-20 rounded bg-gray-200 animate-pulse" />
+                <div className="h-3 w-24 rounded bg-gray-100 animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 h-64 animate-pulse" />
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 space-y-3">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-12 rounded-lg bg-gray-100 animate-pulse" />
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-1 space-y-3">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 h-20 animate-pulse" />
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 h-20 animate-pulse" />
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 h-20 animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }

@@ -116,11 +116,20 @@ export default function VendorOrders() {
     // already-authenticated vendor back to the sign-in form.
     const { data: ordersData } = await supabase
       .from('orders')
-      .select(`*, deal:deals(*), student:user_id(*)`)
+      .select(
+        `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
+         deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, duration_remaining),
+         student:user_id(full_name, phone, university)`
+      )
       .order('created_at', { ascending: false });
 
     if (ordersData) {
-      const mappedOrders: Order[] = ordersData.filter(o => o.deal).map(o => ({
+      // Supabase's select-string type inference can't tell deal:/student:
+      // are to-one relations (no generated Database types configured), so
+      // it infers arrays — cast through `any`; the real runtime shape is a
+      // single object per the foreign key.
+      const ordersDataTyped = ordersData as any[];
+      const mappedOrders: Order[] = ordersDataTyped.filter(o => o.deal).map(o => ({
         id: o.id,
         deal: {
           id: o.deal.id,
