@@ -120,6 +120,7 @@ export default function StudentSignUp() {
     const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
+    const [confirmationSent, setConfirmationSent] = useState(false);
 
     const updateField = useCallback(
         (key: keyof SignUpFormData, value: string) => {
@@ -152,7 +153,14 @@ export default function StudentSignUp() {
                     data: {
                         full_name: form.fullName,
                         phone: form.phone,
-                    }
+                    },
+                    // If "Confirm email" is enabled in Supabase, this is where
+                    // the confirmation link sends the user — through the
+                    // code-exchange callback (safe here, since unlike a
+                    // password-reset link, the user typically confirms in the
+                    // same browser they signed up in) rather than the bare
+                    // Site URL, which has no code-exchange logic at all.
+                    emailRedirectTo: `${window.location.origin}/auth/callback?next=/student/verify`,
                 }
             });
 
@@ -175,6 +183,16 @@ export default function StudentSignUp() {
 
             // The database trigger 'handle_new_student_user' will automatically
             // create the student_profiles row using the options.data we provided above.
+
+            if (!data.session) {
+                // "Confirm email" is enabled and no session was issued yet —
+                // pushing to /student/verify here would just be a dead end,
+                // since that page requires auth and the user isn't signed in
+                // until they click the confirmation link.
+                setIsSubmitting(false);
+                setConfirmationSent(true);
+                return;
+            }
 
             router.push("/student/verify");
         } catch {
@@ -199,6 +217,16 @@ export default function StudentSignUp() {
             </div>
 
             <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md">
+                {confirmationSent ? (
+                    <div className="text-center py-4 space-y-2">
+                        <h3 className="font-display font-bold text-lg text-[#111827]">Check your email</h3>
+                        <p className="text-sm text-gray-500">
+                            We&apos;ve sent a confirmation link to <span className="font-semibold">{form.email}</span>.
+                            Click it to activate your account, then sign in to continue.
+                        </p>
+                    </div>
+                ) : (
+                <>
                 {submitError && (
                     <div
                         role="alert"
@@ -280,6 +308,8 @@ export default function StudentSignUp() {
                         )}
                     </button>
                 </form>
+                </>
+                )}
             </div>
 
             <div className="mt-6 text-center">

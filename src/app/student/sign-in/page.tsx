@@ -44,9 +44,10 @@ function StudentSignInForm() {
     setIsResetting(true);
     setError(null);
     setResetMessage(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
-    });
+    // No redirectTo needed here — the email template links directly to
+    // /auth/reset-password with a token_hash, bypassing the code-exchange
+    // callback entirely (see auth/reset-password/page.tsx for why).
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
     setIsResetting(false);
     setResetMessage(
       error ? error.message : 'If an account exists for that email, a reset link has been sent.'

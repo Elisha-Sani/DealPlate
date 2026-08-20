@@ -27,18 +27,6 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  // Get the user's role from app_metadata (set by server), defaulting to 'student' if none.
-  const role = user?.app_metadata?.role || 'student'
-  const accountStatus = user?.app_metadata?.account_status || 'active'
-
   const path = request.nextUrl.pathname
 
   // Student routes that require a signed-in account. Browsing (explore, deal
@@ -58,6 +46,29 @@ export async function updateSession(request: NextRequest) {
   const isSuperadminRoute = path.startsWith('/superadmin')
   const isVendorRoute = path.startsWith('/vendor') && !path.startsWith('/vendor/sign-in') && !path.startsWith('/vendor/apply')
   const isStudentRoute = STUDENT_AUTH_REQUIRED_PREFIXES.some((prefix) => path.startsWith(prefix))
+
+  // getUser() revalidates the session against the Supabase Auth server (a
+  // real network round-trip — unlike getSession(), which just reads the
+  // local cookie) so it's the only safe way to trust a role/account_status
+  // claim in middleware. That round-trip is real latency (~100-500ms), so
+  // only pay it on routes whose logic below actually depends on the result.
+  // Pages outside these three categories (landing page, sign-in/up forms,
+  // guest-browsable explore/deal pages) never read `user` at all.
+  if (!isSuperadminRoute && !isVendorRoute && !isStudentRoute) {
+    return supabaseResponse
+  }
+
+  // IMPORTANT: Avoid writing any logic between createServerClient and
+  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
+  // issues with users being randomly logged out.
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Get the user's role from app_metadata (set by server), defaulting to 'student' if none.
+  const role = user?.app_metadata?.role || 'student'
+  const accountStatus = user?.app_metadata?.account_status || 'active'
 
   // If no user, serve the sign-in page for the route they tried to access —
   // via rewrite, not redirect, so the address bar still shows the page they

@@ -15,7 +15,7 @@ const navItems = [
   { path: '/vendor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { path: '/vendor/inventory', icon: Package, label: 'Inventory' },
   { path: '/vendor/orders', icon: ListOrdered, label: 'Order Queue' },
-  { path: '#settings', icon: Settings, label: 'Settings' },
+  { path: '/vendor/settings', icon: Settings, label: 'Settings' },
 ] as const;
 
 export default function VendorSidebar() {

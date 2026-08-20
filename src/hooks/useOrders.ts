@@ -6,21 +6,11 @@ import { supabase } from '@/lib/supabase/client';
 import { useUser } from '@/providers/UserProvider';
 import { PICKUP_WINDOW_SECONDS } from '@/lib/constants';
 
-interface OrderRow {
-  id: string;
-  order_date: string;
-  order_time: string;
-  status: string;
-  total_paid: number;
-  pickup_code: string;
-}
-
 interface UseOrdersReturn {
   pastOrders: Order[];
   activeOrder: Order | null;
   ticketSeconds: number;
   setTicketSeconds: (s: number) => void;
-  createOrder: (deal: Deal) => Promise<Order | null>;
   clearActiveOrder: () => void;
   isLoading: boolean;
 }
@@ -96,45 +86,6 @@ export function useOrders(): UseOrdersReturn {
     }
   }, [user?.id]);
 
-  const createOrder = useCallback(
-    async (deal: Deal): Promise<Order | null> => {
-      if (!user?.id) return null;
-      
-      const now = new Date();
-      const orderDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const orderTime = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-      // Atomic RPC: locks the deal row, checks stock under lock, recomputes
-      // price server-side, decrements stock, and inserts the order in one
-      // transaction — avoids overselling and client-tampered prices.
-      const { data, error } = await supabase
-        .rpc('create_order_with_stock_check', {
-          p_deal_id: deal.id,
-          p_order_date: orderDate,
-          p_order_time: orderTime,
-        })
-        .single<OrderRow>();
-
-      if (!error && data) {
-        const order: Order = {
-          id: data.id,
-          deal,
-          date: data.order_date,
-          time: data.order_time,
-          status: data.status as any,
-          totalPaid: Number(data.total_paid),
-          pickupCode: data.pickup_code,
-        };
-        setActiveOrder(order);
-        setTicketSeconds(PICKUP_WINDOW_SECONDS);
-        return order;
-      }
-      if (error) console.error('Failed to create order:', error.message);
-      return null;
-    },
-    [user?.id]
-  );
-
   const clearActiveOrder = useCallback(() => {
     setActiveOrder(null);
   }, []);
@@ -144,7 +95,6 @@ export function useOrders(): UseOrdersReturn {
     activeOrder,
     ticketSeconds,
     setTicketSeconds,
-    createOrder,
     clearActiveOrder,
     isLoading
   };

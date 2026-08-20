@@ -10,10 +10,8 @@ import LiveFeed from '@/components/vendor/LiveFeed';
 import RevenueChart from '@/components/vendor/RevenueChart';
 import type { Deal, Order } from '@/types';
 import { Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 export default function VendorDashboard() {
-  const router = useRouter();
   const [vendorName, setVendorName] = useState('Loading...');
   const [deals, setDeals] = useState<Deal[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -25,19 +23,29 @@ export default function VendorDashboard() {
   const [pendingPickups, setPendingPickups] = useState(0);
 
   const fetchDashboardData = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.user) {
-      router.push('/vendor/sign-in');
+    // No client-side session check/redirect here — middleware already
+    // guarantees only an authenticated vendor ever reaches this page (via
+    // its masked-rewrite gate). A redundant, independently-timed getSession()
+    // check here raced with that guarantee on fresh loads and could bounce
+    // an already-authenticated vendor back to the sign-in form.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setLoading(false);
       return;
     }
 
-    // 1. Get Vendor Profile
-    const { data: vendorData } = await supabase
-      .from('vendors')
-      .select('id, business_name')
-      .eq('id', session.user.id)
-      .single();
+    // Fetch everything in parallel — none of these actually depend on each
+    // other (the vendor's own id is already known from the session), so
+    // there's no reason to wait on the profile lookup before starting the
+    // deals/orders queries.
+    const [{ data: vendorData }, { data: dealsData }, { data: ordersData }] = await Promise.all([
+      supabase.from('vendors').select('id, business_name').eq('id', user.id).single(),
+      supabase.from('deals').select('*').eq('vendor_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('orders').select(`*, deal:deals(*), student:user_id(*)`).order('created_at', { ascending: false }),
+    ]);
 
     if (!vendorData) {
       setVendorName('Vendor Profile Not Found');
@@ -45,13 +53,6 @@ export default function VendorDashboard() {
       return;
     }
     setVendorName(vendorData.business_name);
-
-    // 2. Get Deals
-    const { data: dealsData } = await supabase
-      .from('deals')
-      .select('*')
-      .eq('vendor_id', vendorData.id)
-      .order('created_at', { ascending: false });
 
     let mappedDeals: Deal[] = [];
     if (dealsData) {
@@ -76,12 +77,6 @@ export default function VendorDashboard() {
       setDeals(mappedDeals);
       setActiveBags(mappedDeals.filter((d) => d.isPublished !== false).reduce((sum, d) => sum + d.stockCount, 0));
     }
-
-    // 3. Get Orders
-    const { data: ordersData } = await supabase
-      .from('orders')
-      .select(`*, deal:deals(*), student:user_id(*)`)
-      .order('created_at', { ascending: false });
 
     if (ordersData) {
       // The RLS policy "Vendors can view orders for their deals" filters this automatically, 
@@ -123,7 +118,7 @@ export default function VendorDashboard() {
     }
 
     setLoading(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();

@@ -19,10 +19,10 @@ you should build and test them.
    and create an app.
 2. From that app you get a **Consumer Key** and **Consumer Secret**.
 3. For STK Push (the "Lipa na M-Pesa Online" API) you additionally need:
-   - **Shortcode** — a Paybill or Till number. Safaricom provides a sandbox
-     test shortcode (`174379`) for development.
-   - **Passkey** — provided alongside the sandbox shortcode, or issued for
-     your production shortcode once you're onboarded.
+    - **Shortcode** — a Paybill or Till number. Safaricom provides a sandbox
+      test shortcode (`174379`) for development.
+    - **Passkey** — provided alongside the sandbox shortcode, or issued for
+      your production shortcode once you're onboarded.
 4. **Build and test entirely against sandbox first.** Do not touch
    production credentials until a full sandbox round trip (initiate →
    callback → order created) works.
@@ -59,20 +59,20 @@ The new flow needs to be:
 1. Student taps "Pay with M-Pesa" → client calls a new server action,
    e.g. `initiateMpesaPayment(dealId, phone)`.
 2. That server action:
-   - Gets an OAuth token from Safaricom (`auth.ts`).
-   - Calls the STK Push endpoint (`stkPush.ts`) to trigger the prompt on
-     the student's phone.
-   - **Before returning to the client**, inserts a row into a new
-     `payments` table with `status = 'pending'`, the returned
-     `CheckoutRequestID` and `MerchantRequestID`, the `deal_id`, `user_id`,
-     and a price computed **server-side** from `deals.deal_price` (never
-     trust a client-supplied amount here, same principle as the checkout
-     RPC fix).
+    - Gets an OAuth token from Safaricom (`auth.ts`).
+    - Calls the STK Push endpoint (`stkPush.ts`) to trigger the prompt on
+      the student's phone.
+    - **Before returning to the client**, inserts a row into a new
+      `payments` table with `status = 'pending'`, the returned
+      `CheckoutRequestID` and `MerchantRequestID`, the `deal_id`, `user_id`,
+      and a price computed **server-side** from `deals.deal_price` (never
+      trust a client-supplied amount here, same principle as the checkout
+      RPC fix).
 3. The client shows a "waiting for payment" state and either:
-   - polls `/api/mpesa/status?checkoutRequestId=...` (which just reads the
-     `payments` row), or
-   - subscribes to Supabase Realtime on that `payments` row — nicer UX,
-     avoids polling.
+    - polls `/api/mpesa/status?checkoutRequestId=...` (which just reads the
+      `payments` row), or
+    - subscribes to Supabase Realtime on that `payments` row — nicer UX,
+      avoids polling.
 4. Safaricom calls your `/api/mpesa/callback` webhook once the student
    completes or cancels the prompt.
 5. **Only the callback handler** — using the service-role client — updates
@@ -150,7 +150,7 @@ real one. Your defenses:
 3. **Never let the callback body alone determine the amount or the order.**
    Re-derive everything from your own `payments` row (which you wrote
    server-side, from the real `deals.deal_price`) — the callback should
-   only tell you *whether* that specific pending transaction succeeded,
+   only tell you _whether_ that specific pending transaction succeeded,
    not what it was for.
 
 ### Idempotency is mandatory, not optional
@@ -163,16 +163,16 @@ payload:
 - The status transition must be an atomic guarded update, the same pattern
   used for the pickup-confirmation fix in the security audit:
 
-  ```sql
-  UPDATE public.payments
-     SET status = 'completed', mpesa_receipt = $1, result_code = 0
-   WHERE checkout_request_id = $2
-     AND status = 'pending'
-   RETURNING id;
-  ```
+    ```sql
+    UPDATE public.payments
+       SET status = 'completed', mpesa_receipt = $1, result_code = 0
+     WHERE checkout_request_id = $2
+       AND status = 'pending'
+     RETURNING id;
+    ```
 
-  If this returns zero rows, the payment was already processed — do
-  nothing further (in particular, do **not** create a second order).
+    If this returns zero rows, the payment was already processed — do
+    nothing further (in particular, do **not** create a second order).
 
 ### Reading the callback payload
 
@@ -180,22 +180,22 @@ The callback body looks like:
 
 ```json
 {
-  "Body": {
-    "stkCallback": {
-      "MerchantRequestID": "...",
-      "CheckoutRequestID": "...",
-      "ResultCode": 0,
-      "ResultDesc": "The service request is processed successfully.",
-      "CallbackMetadata": {
-        "Item": [
-          { "Name": "Amount", "Value": 100 },
-          { "Name": "MpesaReceiptNumber", "Value": "NLJ..." },
-          { "Name": "TransactionDate", "Value": 20260819123456 },
-          { "Name": "PhoneNumber", "Value": 254712345678 }
-        ]
-      }
+    "Body": {
+        "stkCallback": {
+            "MerchantRequestID": "...",
+            "CheckoutRequestID": "...",
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+            "CallbackMetadata": {
+                "Item": [
+                    { "Name": "Amount", "Value": 100 },
+                    { "Name": "MpesaReceiptNumber", "Value": "NLJ..." },
+                    { "Name": "TransactionDate", "Value": 20260819123456 },
+                    { "Name": "PhoneNumber", "Value": 254712345678 }
+                ]
+            }
+        }
     }
-  }
 }
 ```
 
