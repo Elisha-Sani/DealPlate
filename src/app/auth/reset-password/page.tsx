@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'motion/react';
 import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -17,10 +26,28 @@ export default function ResetPasswordPage() {
   const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(null);
 
   useEffect(() => {
+    const tokenHash = searchParams.get('token_hash');
+    const type = searchParams.get('type');
+
+    // Verify the recovery token directly — this works from any browser or
+    // device, unlike the code-exchange flow, which requires a matching
+    // "code verifier" cookie set in the same browser that requested the
+    // reset (breaks whenever the email link is opened somewhere else, e.g.
+    // a different device, an email client's in-app browser, or a security
+    // scanner pre-fetching the link).
+    if (tokenHash && type === 'recovery') {
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type: 'recovery' }).then(({ error }) => {
+        setHasRecoverySession(!error);
+      });
+      return;
+    }
+
+    // Fallback: an already-established session (e.g. page refresh after
+    // verification already succeeded above).
     supabase.auth.getSession().then(({ data: { session } }) => {
       setHasRecoverySession(Boolean(session));
     });
-  }, []);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +93,12 @@ export default function ResetPasswordPage() {
         </p>
       </div>
 
-      {hasRecoverySession === false ? (
+      {hasRecoverySession === null ? (
+        <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md flex items-center justify-center gap-3 text-sm text-gray-500">
+          <div className="w-5 h-5 border-2 border-gray-200 border-t-[#FF6B00] rounded-full animate-spin" />
+          Verifying your reset link...
+        </div>
+      ) : hasRecoverySession === false ? (
         <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-md text-center text-sm text-red-600">
           This password reset link is invalid or has expired. Please request a new one from the sign-in page.
         </div>
