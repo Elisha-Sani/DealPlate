@@ -136,8 +136,10 @@ export async function submitStudentKyc(formData: FormData) {
         student_id_file_name: studentIdFile!.name,
         university_doc_file_name: universityDocFile!.name,
         university_doc_date: documentDate,
-        student_id_url: uploadedStudentIdPath,
-        university_doc_url: uploadedUniversityDocPath,
+        document_data: {
+          student_id_url: uploadedStudentIdPath,
+          university_doc_url: uploadedUniversityDocPath
+        },
         ai_recommendation: aiReview.recommendation,
         ai_confidence: aiReview.confidence,
         ai_summary: aiReview.summary,

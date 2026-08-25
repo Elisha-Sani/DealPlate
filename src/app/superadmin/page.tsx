@@ -24,62 +24,12 @@ import type { AdminOverviewStats } from '@/app/actions/adminGetOverview';
 import type { AdminDealRow } from '@/app/actions/adminGetDeals';
 import type { AdminActionRow } from '@/app/actions/adminGetAuditLog';
 
-const STATUS_STYLES: Record<string, string> = {
-  pending_review: 'bg-amber-50 text-amber-700',
-  approved: 'bg-green-50 text-green-700',
-  rejected: 'bg-red-50 text-red-700',
-  revoked: 'bg-red-100 text-red-800',
-};
-
-function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] || 'bg-gray-100 text-gray-600';
-  return (
-    <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full whitespace-nowrap ${style}`}>
-      {status.replace(/_/g, ' ')}
-    </span>
-  );
-}
-
-function StatCard({ label, value, accent }: { label: string; value: number; accent?: string }) {
-  return (
-    <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-      <p className="text-xs text-gray-500 font-bold uppercase tracking-wide">{label}</p>
-      <p className={`text-2xl font-black mt-1 ${accent || 'text-[#1E293B]'}`}>{value}</p>
-    </div>
-  );
-}
-
-interface StudentKycApplication {
-  id: string;
-  student_id: string;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  university: string;
-  reg_number: string;
-  student_id_file_name: string;
-  university_doc_file_name: string;
-  university_doc_date: string;
-  ai_recommendation: string;
-  ai_confidence: number;
-  ai_summary: string | null;
-  ai_flags: string[] | null;
-  status: string;
-  created_at: string;
-}
-
-interface VendorApplication {
-  id: string;
-  auth_user_id: string | null;
-  business_name: string;
-  contact_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  campus_proximity: string;
-  status: string;
-  created_at: string;
-}
+import { OverviewTab } from './components/OverviewTab';
+import { StudentKycTab } from './components/StudentKycTab';
+import { VendorsTab } from './components/VendorsTab';
+import { DealsTab } from './components/DealsTab';
+import { AuditLogTab } from './components/AuditLogTab';
+import type { StudentKycApplication, VendorApplication } from './types';
 
 type Tab = 'overview' | 'students' | 'vendors' | 'deals' | 'audit';
 
@@ -115,6 +65,7 @@ export default function SuperadminDashboard() {
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorStatusFilter, setVendorStatusFilter] = useState('all');
   const [dealSearch, setDealSearch] = useState('');
+  const [dealStatusFilter, setDealStatusFilter] = useState('all');
 
   const [modalConfig, setModalConfig] = useState<{
     title: string;
@@ -383,10 +334,15 @@ export default function SuperadminDashboard() {
 
   const filteredDeals = useMemo(() => {
     const q = dealSearch.trim().toLowerCase();
-    return deals.filter(
-      (deal) => !q || deal.title.toLowerCase().includes(q) || deal.vendor.toLowerCase().includes(q)
-    );
-  }, [deals, dealSearch]);
+    return deals.filter((deal) => {
+      const matchesSearch = !q || deal.title.toLowerCase().includes(q) || deal.vendor.toLowerCase().includes(q);
+      let matchesStatus = true;
+      if (dealStatusFilter === 'published') matchesStatus = deal.is_published && deal.stock_count > 0;
+      if (dealStatusFilter === 'hidden') matchesStatus = !deal.is_published;
+      if (dealStatusFilter === 'sold_out') matchesStatus = deal.stock_count === 0;
+      return matchesSearch && matchesStatus;
+    });
+  }, [deals, dealSearch, dealStatusFilter]);
 
   if (!isUnlocked) {
     return (
@@ -462,286 +418,64 @@ export default function SuperadminDashboard() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex gap-1 bg-white border border-[#E2E8F0] rounded-xl p-1 w-fit overflow-x-auto">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`h-9 px-4 rounded-lg text-sm font-bold flex items-center gap-2 whitespace-nowrap transition-colors ${
-                activeTab === tab.id ? 'bg-[#1E293B] text-white' : 'text-gray-500 hover:text-[#1E293B]'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              {tab.label}
-            </button>
-          ))}
+        {/* Layout Container */}
+        <div className="flex flex-col md:flex-row gap-6 items-start">
+          {/* Tab bar / Sidebar */}
+          <div className="flex md:flex-col gap-1 bg-white border border-[#E2E8F0] rounded-xl p-1.5 w-full md:w-64 overflow-x-auto shrink-0">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`h-10 px-3 md:px-4 rounded-lg text-sm font-bold flex items-center justify-center md:justify-start gap-2.5 whitespace-nowrap transition-colors ${
+                  activeTab === tab.id ? 'bg-[#1E293B] text-white shadow-sm' : 'text-gray-500 hover:text-[#1E293B] hover:bg-gray-50'
+                }`}
+              >
+                <tab.icon className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 min-w-0 w-full">
+            {activeTab === 'overview' && <OverviewTab overviewStats={overviewStats} />}
+            {activeTab === 'students' && (
+              <StudentKycTab
+                filteredStudentApps={filteredStudentApps}
+                studentSearch={studentSearch}
+                setStudentSearch={setStudentSearch}
+                studentStatusFilter={studentStatusFilter}
+                setStudentStatusFilter={setStudentStatusFilter}
+                reviewStudent={reviewStudent}
+                handleRevokeStudent={handleRevokeStudent}
+                handleUnrevokeStudent={handleUnrevokeStudent}
+              />
+            )}
+            {activeTab === 'vendors' && (
+              <VendorsTab
+                filteredVendorApps={filteredVendorApps}
+                vendorSearch={vendorSearch}
+                setVendorSearch={setVendorSearch}
+                vendorStatusFilter={vendorStatusFilter}
+                setVendorStatusFilter={setVendorStatusFilter}
+                reviewVendor={reviewVendor}
+                handleRevokeVendor={handleRevokeVendor}
+                handleUnrevokeVendor={handleUnrevokeVendor}
+              />
+            )}
+            {activeTab === 'deals' && (
+              <DealsTab
+                filteredDeals={filteredDeals}
+                dealSearch={dealSearch}
+                setDealSearch={setDealSearch}
+                dealStatusFilter={dealStatusFilter}
+                setDealStatusFilter={setDealStatusFilter}
+                handleToggleDealPublished={handleToggleDealPublished}
+                handleDeleteDeal={handleDeleteDeal}
+              />
+            )}
+            {activeTab === 'audit' && <AuditLogTab auditLog={auditLog} />}
+          </div>
         </div>
-
-        {activeTab === 'overview' && (
-          <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <StatCard label="Students" value={overviewStats?.totalStudents ?? 0} />
-            <StatCard label="Verified Students" value={overviewStats?.verifiedStudents ?? 0} accent="text-green-600" />
-            <StatCard label="Pending KYC" value={overviewStats?.pendingKycReviews ?? 0} accent="text-amber-600" />
-            <StatCard label="Revoked Students" value={overviewStats?.revokedStudents ?? 0} accent="text-red-600" />
-            <StatCard label="Vendors" value={overviewStats?.totalVendors ?? 0} />
-            <StatCard label="Approved Vendors" value={overviewStats?.approvedVendors ?? 0} accent="text-green-600" />
-            <StatCard label="Pending Vendor Apps" value={overviewStats?.pendingVendorApplications ?? 0} accent="text-amber-600" />
-            <StatCard label="Revoked Vendors" value={overviewStats?.revokedVendors ?? 0} accent="text-red-600" />
-            <StatCard label="Active Orders" value={overviewStats?.activeOrders ?? 0} />
-            <StatCard label="Completed Orders" value={overviewStats?.completedOrders ?? 0} accent="text-green-600" />
-          </section>
-        )}
-
-        {activeTab === 'students' && (
-          <section className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-[#FF6B00]" />
-                <h2 className="font-bold text-lg">Student KYC</h2>
-              </div>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    value={studentSearch}
-                    onChange={(e) => setStudentSearch(e.target.value)}
-                    placeholder="Search name, email, reg no..."
-                    className="h-9 pl-9 pr-3 rounded-lg border border-[#E2E8F0] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00] w-64"
-                  />
-                </div>
-                <select
-                  value={studentStatusFilter}
-                  onChange={(e) => setStudentStatusFilter(e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00]"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="pending_review">Pending review</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="revoked">Revoked</option>
-                </select>
-              </div>
-            </div>
-            <div className="divide-y divide-[#E2E8F0]">
-              {filteredStudentApps.length === 0 ? (
-                <p className="p-5 text-sm text-gray-500">No matching student KYC applications.</p>
-              ) : (
-                filteredStudentApps.map((app) => (
-                  <article key={app.id} className="p-5 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-bold">{app.full_name}</h3>
-                        <p className="text-xs text-gray-500">{app.university} &bull; {app.reg_number}</p>
-                      </div>
-                      <StatusBadge status={app.status} />
-                    </div>
-                    <p className="text-sm text-gray-600">{app.ai_summary || 'No AI summary.'}</p>
-                    <div className="text-xs text-gray-500 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <span>ID: {app.student_id_file_name}</span>
-                      <span>Doc: {app.university_doc_file_name}</span>
-                      <span>Date: {app.university_doc_date}</span>
-                      <span>AI: {app.ai_recommendation} ({app.ai_confidence}%)</span>
-                    </div>
-                    {app.ai_flags && app.ai_flags.length > 0 && (
-                      <ul className="text-xs text-[#E11D48] list-disc pl-4">
-                        {app.ai_flags.map((flag) => <li key={flag}>{flag}</li>)}
-                      </ul>
-                    )}
-                    {app.status === 'pending_review' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => reviewStudent(app.id, 'approved')} className="h-9 px-3 rounded-lg bg-green-600 text-white text-xs font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Approve
-                        </button>
-                        <button onClick={() => reviewStudent(app.id, 'rejected')} className="h-9 px-3 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1">
-                          <XCircle className="w-4 h-4" /> Reject
-                        </button>
-                      </div>
-                    )}
-                    {app.status === 'approved' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => handleRevokeStudent(app.student_id)} className="h-9 px-3 rounded-lg border border-red-600 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1">
-                          <XCircle className="w-4 h-4" /> Revoke Access
-                        </button>
-                      </div>
-                    )}
-                    {app.status === 'revoked' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => handleUnrevokeStudent(app.student_id)} className="h-9 px-3 rounded-lg bg-green-600 text-white text-xs font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Reinstate Access
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'vendors' && (
-          <section className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <div className="flex items-center gap-2">
-                <Store className="w-5 h-5 text-[#FF6B00]" />
-                <h2 className="font-bold text-lg">Vendor Onboarding</h2>
-              </div>
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    value={vendorSearch}
-                    onChange={(e) => setVendorSearch(e.target.value)}
-                    placeholder="Search business, email, contact..."
-                    className="h-9 pl-9 pr-3 rounded-lg border border-[#E2E8F0] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00] w-64"
-                  />
-                </div>
-                <select
-                  value={vendorStatusFilter}
-                  onChange={(e) => setVendorStatusFilter(e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00]"
-                >
-                  <option value="all">All statuses</option>
-                  <option value="pending_review">Pending review</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                  <option value="revoked">Revoked</option>
-                </select>
-              </div>
-            </div>
-            <div className="divide-y divide-[#E2E8F0]">
-              {filteredVendorApps.length === 0 ? (
-                <p className="p-5 text-sm text-gray-500">No matching vendor applications.</p>
-              ) : (
-                filteredVendorApps.map((app) => (
-                  <article key={app.id} className="p-5 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-bold">{app.business_name}</h3>
-                        <p className="text-xs text-gray-500">{app.email} &bull; {app.phone}</p>
-                      </div>
-                      <StatusBadge status={app.status} />
-                    </div>
-                    <p className="text-sm text-gray-600">{app.address}</p>
-                    <p className="text-xs text-gray-500">Contact: {app.contact_name} &bull; Campus: {app.campus_proximity}</p>
-                    {app.status === 'pending_review' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => reviewVendor(app.id, 'approved')} className="h-9 px-3 rounded-lg bg-green-600 text-white text-xs font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Approve
-                        </button>
-                        <button onClick={() => reviewVendor(app.id, 'rejected')} className="h-9 px-3 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1">
-                          <XCircle className="w-4 h-4" /> Reject
-                        </button>
-                      </div>
-                    )}
-                    {app.status === 'approved' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => handleRevokeVendor(app.auth_user_id || '', app.id)} className="h-9 px-3 rounded-lg border border-red-600 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1">
-                          <XCircle className="w-4 h-4" /> Revoke Access
-                        </button>
-                      </div>
-                    )}
-                    {app.status === 'revoked' && (
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => handleUnrevokeVendor(app.auth_user_id || '', app.id)} className="h-9 px-3 rounded-lg bg-green-600 text-white text-xs font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-4 h-4" /> Reinstate Access
-                        </button>
-                      </div>
-                    )}
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'deals' && (
-          <section className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-[#FF6B00]" />
-                <h2 className="font-bold text-lg">All Deals</h2>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  value={dealSearch}
-                  onChange={(e) => setDealSearch(e.target.value)}
-                  placeholder="Search title or vendor..."
-                  className="h-9 pl-9 pr-3 rounded-lg border border-[#E2E8F0] text-sm outline-none focus:ring-2 focus:ring-[#FF6B00] w-64"
-                />
-              </div>
-            </div>
-            <div className="divide-y divide-[#E2E8F0]">
-              {filteredDeals.length === 0 ? (
-                <p className="p-5 text-sm text-gray-500">No matching deals.</p>
-              ) : (
-                filteredDeals.map((deal) => (
-                  <article key={deal.id} className="p-5 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold">{deal.title}</h3>
-                        <span
-                          className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${
-                            deal.is_published ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {deal.is_published ? 'Published' : 'Hidden'}
-                        </span>
-                        {deal.stock_count === 0 && (
-                          <span className="text-[10px] font-black uppercase px-2 py-1 rounded-full bg-red-50 text-red-700">Sold out</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">{deal.vendor} &bull; {deal.campus} &bull; Ksh {deal.deal_price} ({deal.stock_count} left)</p>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      <button
-                        onClick={() => handleToggleDealPublished(deal)}
-                        className="h-9 px-3 rounded-lg border border-[#E2E8F0] text-xs font-bold text-[#1E293B] hover:bg-gray-50 flex items-center gap-1"
-                      >
-                        {deal.is_published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        {deal.is_published ? 'Unpublish' : 'Publish'}
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDeal(deal)}
-                        className="h-9 px-3 rounded-lg border border-red-600 text-red-600 hover:bg-red-50 text-xs font-bold flex items-center gap-1"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </section>
-        )}
-
-        {activeTab === 'audit' && (
-          <section className="bg-white border border-[#E2E8F0] rounded-xl shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-[#E2E8F0] flex items-center gap-2">
-              <ScrollText className="w-5 h-5 text-[#FF6B00]" />
-              <h2 className="font-bold text-lg">Audit Log</h2>
-              <span className="text-xs text-gray-400 font-medium">(most recent 200 actions)</span>
-            </div>
-            <div className="divide-y divide-[#E2E8F0] max-h-[70vh] overflow-y-auto">
-              {auditLog.length === 0 ? (
-                <p className="p-5 text-sm text-gray-500">No admin actions recorded yet.</p>
-              ) : (
-                auditLog.map((entry) => (
-                  <div key={entry.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 justify-between text-sm">
-                    <div>
-                      <span className="font-bold text-[#1E293B]">{entry.admin_email}</span>
-                      <span className="text-gray-500"> {entry.action_type} </span>
-                      <span className="text-gray-500">{entry.target_type} ({entry.target_id.slice(0, 8)})</span>
-                      {entry.reason && <p className="text-xs text-gray-400 mt-0.5">Reason: {entry.reason}</p>}
-                    </div>
-                    <span className="text-xs text-gray-400 shrink-0">{new Date(entry.created_at).toLocaleString()}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        )}
       </motion.div>
 
       {/* Confirmation Modal */}

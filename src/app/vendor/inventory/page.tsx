@@ -14,6 +14,7 @@ import {
     Save,
     Search,
     Sparkles,
+    Trash2,
     X,
 } from "lucide-react";
 import VendorTopBar from "@/components/layout/VendorTopBar";
@@ -44,6 +45,7 @@ interface InventoryItem {
     detailedDescription: string;
     stockCount: number;
     isPublished: boolean;
+    expiresAt: string;
     createdAt: string;
 }
 
@@ -60,6 +62,7 @@ interface InventoryForm {
     briefDescription: string;
     detailedDescription: string;
     isPublished: boolean;
+    activeHours: number;
 }
 
 const emptyForm: InventoryForm = {
@@ -75,6 +78,7 @@ const emptyForm: InventoryForm = {
     briefDescription: "",
     detailedDescription: "",
     isPublished: true,
+    activeHours: 2,
 };
 
 const categories = [
@@ -107,6 +111,7 @@ function mapInventoryItem(row: any): InventoryItem {
         detailedDescription: row.detailed_description || "",
         stockCount: Number(row.stock_count),
         isPublished: row.is_published !== false,
+        expiresAt: row.expires_at,
         createdAt: row.created_at,
     };
 }
@@ -232,6 +237,7 @@ export default function VendorInventory() {
             briefDescription: item.briefDescription || item.description,
             detailedDescription: item.detailedDescription,
             isPublished: item.isPublished,
+            activeHours: 2,
         });
     };
 
@@ -288,7 +294,26 @@ export default function VendorInventory() {
                 ? Math.max(0, Math.round(((original - deal) / original) * 100))
                 : 0;
 
-        return {
+        const payload: {
+            vendor_id: string;
+            vendor: string;
+            title: string;
+            campus: string;
+            original_price: number;
+            deal_price: number;
+            image: string;
+            discount_percentage: number;
+            time_start: string;
+            time_end: string;
+            category: string;
+            tags: string[];
+            description: string;
+            brief_description: string;
+            detailed_description: string;
+            stock_count: number;
+            is_published: boolean;
+            expires_at?: string;
+        } = {
             vendor_id: vendor.id,
             vendor: vendor.business_name,
             title: form.title.trim(),
@@ -307,8 +332,18 @@ export default function VendorInventory() {
             detailed_description: form.detailedDescription,
             stock_count: form.stockCount,
             is_published: form.isPublished,
-            duration_remaining: "02:00:00",
         };
+
+        // Only set a fresh expiry when creating a new item — editing an
+        // existing one (e.g. fixing a typo) shouldn't silently reset its
+        // countdown. Use "Publish"/"Extend" on an expired item instead.
+        if (!editingId) {
+            payload.expires_at = new Date(
+                Date.now() + form.activeHours * 60 * 60 * 1000,
+            ).toISOString();
+        }
+
+        return payload;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -350,13 +385,23 @@ export default function VendorInventory() {
     };
 
     const togglePublished = async (item: InventoryItem) => {
-        setMessage(
-            item.isPublished ? "Unpublishing item..." : "Publishing item...",
-        );
-        const { error } = await supabase
-            .from("deals")
-            .update({ is_published: !item.isPublished })
-            .eq("id", item.id);
+        const willPublish = !item.isPublished;
+        const isExpired = new Date(item.expiresAt).getTime() <= Date.now();
+        // Re-publishing something that already expired needs a fresh
+        // window too, otherwise the next auto-unpublish sweep would just
+        // immediately hide it again.
+        const needsFreshExpiry = willPublish && isExpired;
+
+        setMessage(willPublish ? "Publishing item..." : "Unpublishing item...");
+
+        const update: { is_published: boolean; expires_at?: string } = {
+            is_published: willPublish,
+        };
+        if (needsFreshExpiry) {
+            update.expires_at = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+        }
+
+        const { error } = await supabase.from("deals").update(update).eq("id", item.id);
 
         if (error) {
             setMessage(error.message);
@@ -366,15 +411,41 @@ export default function VendorInventory() {
         setItems((prev) =>
             prev.map((current) =>
                 current.id === item.id
-                    ? { ...current, isPublished: !item.isPublished }
+                    ? { ...current, isPublished: willPublish, expiresAt: update.expires_at || current.expiresAt }
                     : current,
             ),
         );
         setMessage(
-            item.isPublished
-                ? "Item hidden from Explore."
-                : "Item published to Explore.",
+            willPublish
+                ? needsFreshExpiry
+                    ? "Item republished with a fresh 2-hour window."
+                    : "Item published to Explore."
+                : "Item hidden from Explore.",
         );
+    };
+
+    const handleDeleteProduct = async (item: InventoryItem) => {
+        const confirmDelete = window.confirm(`Are you sure you want to delete "${item.title}"?`);
+        if (!confirmDelete) return;
+
+        setMessage("Deleting item...");
+
+        const { error } = await supabase.from("deals").delete().eq("id", item.id);
+
+        if (error) {
+            if (error.code === '23503') { // Foreign key violation
+                setMessage(`Cannot delete "${item.title}" because it has existing orders. Please unpublish it instead.`);
+            } else {
+                setMessage(`Failed to delete: ${error.message}`);
+            }
+            return;
+        }
+
+        setItems((prev) => prev.filter((current) => current.id !== item.id));
+        setMessage(`Item "${item.title}" deleted successfully.`);
+        if (editingId === item.id) {
+            resetForm();
+        }
     };
 
     const stats = {
@@ -580,6 +651,30 @@ export default function VendorInventory() {
                                 </div>
                             </div>
 
+                            {!editingId && (
+                                <div>
+                                    <label className="block text-sm font-medium text-[#1E293B] mb-2">
+                                        Active for (hours)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="24"
+                                        value={form.activeHours}
+                                        onChange={(e) =>
+                                            updateForm(
+                                                "activeHours",
+                                                Math.max(1, Number(e.target.value) || 1),
+                                            )
+                                        }
+                                        className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] focus:bg-white focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1.5">
+                                        The deal automatically unpublishes once this window ends — you can republish it any time from the list below.
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-[#1E293B] mb-2">
@@ -634,26 +729,28 @@ export default function VendorInventory() {
                                 <label className="block text-sm font-medium text-[#1E293B] mb-2">
                                     Product image
                                 </label>
-                                <div className="flex gap-3 items-center">
+                                <div className="flex gap-4 items-center">
                                     <button
                                         type="button"
                                         onClick={() =>
                                             fileInputRef.current?.click()
                                         }
-                                        className="h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#1E293B] hover:bg-gray-50 flex items-center gap-2"
+                                        className="h-11 px-4 rounded-lg border border-[#E2E8F0] text-sm font-bold text-[#1E293B] hover:bg-gray-50 flex items-center gap-2 shrink-0"
                                     >
                                         <ImageIcon className="w-4 h-4" /> Upload
                                     </button>
                                     {form.image && (
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                updateForm("image", "")
-                                            }
-                                            className="h-11 w-11 rounded-lg border border-[#E2E8F0] text-red-500 hover:bg-red-50 flex items-center justify-center"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
+                                        <div className="relative group rounded-lg overflow-hidden border border-[#E2E8F0] w-16 h-16 shrink-0">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={form.image} alt="Preview" className="w-full h-full object-cover" />
+                                            <button
+                                                type="button"
+                                                onClick={() => updateForm("image", "")}
+                                                className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     )}
                                     <input
                                         ref={fileInputRef}
@@ -662,11 +759,11 @@ export default function VendorInventory() {
                                         accept="image/*"
                                         onChange={handleImageChange}
                                     />
-                                    <span className="text-xs text-gray-500 truncate">
-                                        {form.image
-                                            ? "Image selected"
-                                            : "Default image used if empty"}
-                                    </span>
+                                    {!form.image && (
+                                        <span className="text-xs text-gray-500 truncate">
+                                            Default image used if empty
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -908,6 +1005,16 @@ export default function VendorInventory() {
                                                     {item.isPublished
                                                         ? "Unpublish"
                                                         : "Publish"}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleDeleteProduct(item)
+                                                    }
+                                                    className="h-9 px-3 rounded-lg border border-red-200 text-xs font-bold text-red-600 hover:bg-red-50 flex items-center gap-1"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                    Delete
                                                 </button>
                                             </div>
                                         </div>

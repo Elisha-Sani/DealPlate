@@ -50,7 +50,7 @@ By matching excess high-quality food with hungry students, DealPlate actively fi
 DealPlate is a modern, dynamic web application designed to connect university students with local food vendors to rescue high-quality surplus meals at significant discounts.
 
 ## Tech Stack
-- **Framework:** Next.js 14 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Styling:** Tailwind CSS, Framer Motion
 - **Backend/Database:** Supabase (PostgreSQL, Auth, Realtime)
 - **Deployment:** Vercel (Recommended)

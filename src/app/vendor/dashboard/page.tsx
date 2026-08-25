@@ -47,7 +47,7 @@ export default function VendorDashboard() {
         .from('orders')
         .select(
           `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
-           deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, duration_remaining),
+           deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, expires_at),
            student:user_id(full_name, phone, university)`
         )
         .order('created_at', { ascending: false }),
@@ -78,7 +78,7 @@ export default function VendorDashboard() {
         description: d.description,
         stockCount: d.stock_count,
         isPublished: d.is_published !== false,
-        durationRemaining: d.duration_remaining
+        expiresAt: d.expires_at
       }));
       setDeals(mappedDeals);
       setActiveBags(mappedDeals.filter((d) => d.isPublished !== false).reduce((sum, d) => sum + d.stockCount, 0));
@@ -108,7 +108,7 @@ export default function VendorDashboard() {
           category: o.deal.category,
           stockCount: o.deal.stock_count,
           isPublished: o.deal.is_published !== false,
-          durationRemaining: o.deal.duration_remaining
+          expiresAt: o.deal.expires_at
         } as Deal,
         student: o.student ? {
           full_name: o.student.full_name,

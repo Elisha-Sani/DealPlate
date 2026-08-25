@@ -15,7 +15,7 @@ const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartDeal, setCartDeal] = useState<Deal | null>(null);
-  const [mpesaPhone, setMpesaPhone] = useState('712 345 678');
+  const [mpesaPhone, setMpesaPhone] = useState('');
 
   const clearCart = useCallback(() => {
     setCartDeal(null);

@@ -11,7 +11,7 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => setIsAuthenticated(Boolean(session)));
+    supabase.auth.getUser().then(({ data: { user } }) => setIsAuthenticated(Boolean(user)));
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => setIsAuthenticated(Boolean(session)));

@@ -51,7 +51,7 @@ export function useOrders(): UseOrdersReturn {
             timeEnd: o.deal.time_end,
             category: o.deal.category,
             stockCount: o.deal.stock_count,
-            durationRemaining: o.deal.duration_remaining
+            expiresAt: o.deal.expires_at
           } as Deal,
           date: o.order_date,
           time: o.order_time,
@@ -60,9 +60,12 @@ export function useOrders(): UseOrdersReturn {
           pickupCode: o.pickup_code,
           pickupDeadline: o.pickup_deadline
         }));
-        setPastOrders(mapped);
+        const active = mapped.find(o => o.status === 'Active') || null;
+        setActiveOrder(active);
+        setPastOrders(mapped.filter(o => o.id !== active?.id));
       } else {
         setPastOrders([]);
+        setActiveOrder(null);
       }
       setIsLoading(false);
     }

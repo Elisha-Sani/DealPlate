@@ -10,19 +10,22 @@ interface UseCountdownReturn {
 }
 
 export function useCountdown(initialSeconds: number, onExpire?: () => void): UseCountdownReturn {
-  const [seconds, setSeconds] = useState(initialSeconds);
+  const [currentInitial, setCurrentInitial] = useState(initialSeconds);
+  const [seconds, setSeconds] = useState(currentInitial);
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
   useEffect(() => {
-    setSeconds(initialSeconds);
+    setCurrentInitial(initialSeconds);
   }, [initialSeconds]);
 
   // A single interval ticking for the lifetime of a countdown, instead of
   // being torn down and recreated every second (which drifts under tab
   // throttling since each recreation restarts the 1000ms timer from zero).
   useEffect(() => {
-    if (initialSeconds <= 0) {
+    setSeconds(currentInitial);
+
+    if (currentInitial <= 0) {
       onExpireRef.current?.();
       return;
     }
@@ -39,7 +42,7 @@ export function useCountdown(initialSeconds: number, onExpire?: () => void): Use
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [initialSeconds]);
+  }, [currentInitial]);
 
   const formatTime = (totalSeconds: number): string => {
     const hrs = Math.floor(totalSeconds / 3600);
@@ -54,7 +57,7 @@ export function useCountdown(initialSeconds: number, onExpire?: () => void): Use
   };
 
   const reset = useCallback((newSeconds: number) => {
-    setSeconds(newSeconds);
+    setCurrentInitial(newSeconds);
   }, []);
 
   return {

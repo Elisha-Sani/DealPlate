@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 interface VendorApplicationInput {
   businessName: string;
@@ -12,25 +12,8 @@ interface VendorApplicationInput {
   password: string;
 }
 
-function createAdminClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_SUPABASE_URL;
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
-
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL/NEXT_SUPABASE_URL or SUPABASE_SECRET_KEY.');
-  }
-
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}
-
 export async function submitVendorApplication(input: VendorApplicationInput) {
   try {
-    const supabaseAdmin = createAdminClient();
     const email = input.email.trim().toLowerCase();
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

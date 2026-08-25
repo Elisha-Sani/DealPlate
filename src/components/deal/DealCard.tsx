@@ -4,7 +4,7 @@ import { Store, ShoppingBag } from 'lucide-react';
 import type { Deal } from '@/types';
 import Price from '@/components/ui/Price';
 import Timer from '@/components/ui/Timer';
-import { parseDurationToSeconds } from '@/lib/utils';
+import { secondsUntil } from '@/lib/utils';
 
 interface DealCardProps {
   deal: Deal;
@@ -53,7 +53,7 @@ export default function DealCard({ deal, layout = 'grid', onSelect, onQuickReser
         )}
 
         <div className="flex items-center justify-between mt-1">
-          <Timer initialSeconds={parseDurationToSeconds(deal.durationRemaining)} />
+          <Timer initialSeconds={secondsUntil(deal.expiresAt)} />
           <span className={`font-bold text-[#E11D48] bg-[#E11D48]/10 rounded-full ${isMasonry ? 'text-[9px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
             {deal.stockCount} left
           </span>

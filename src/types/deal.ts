@@ -16,7 +16,7 @@ export interface Deal {
   detailedDescription?: string;
   stockCount: number;
   isPublished?: boolean;
-  durationRemaining: string; // "hh:mm:ss"
+  expiresAt: string; // ISO timestamp — the deal auto-unpublishes once this passes
 }
 
 export type DealCategory =

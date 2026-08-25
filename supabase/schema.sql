@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT vendors_status_check
-        CHECK (status IN ('pending_review', 'approved', 'suspended')),
+        CHECK (status IN ('pending_review', 'approved', 'suspended', 'revoked')),
     CONSTRAINT vendors_email_check
         CHECK (position('@' in email) > 1)
 );
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS public.deals (
     detailed_description text,
     stock_count integer NOT NULL DEFAULT 0,
     is_published boolean NOT NULL DEFAULT true,
-    duration_remaining text NOT NULL DEFAULT '00:00:00',
+    expires_at timestamptz NOT NULL DEFAULT (now() + interval '2 hours'),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT deals_prices_check
@@ -77,8 +77,6 @@ CREATE TABLE IF NOT EXISTS public.deals (
         CHECK (discount_percentage BETWEEN 0 AND 100),
     CONSTRAINT deals_stock_count_check
         CHECK (stock_count >= 0),
-    CONSTRAINT deals_duration_remaining_check
-        CHECK (duration_remaining ~ '^[0-9]{2}:[0-9]{2}:[0-9]{2}$')
 );
 
 CREATE TABLE IF NOT EXISTS public.orders (
@@ -299,7 +297,7 @@ CREATE TABLE IF NOT EXISTS public.student_kyc_applications (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT student_kyc_status_check
-        CHECK (status IN ('pending_review', 'approved', 'rejected')),
+        CHECK (status IN ('pending_review', 'approved', 'rejected', 'revoked')),
     CONSTRAINT student_kyc_ai_recommendation_check
         CHECK (ai_recommendation IN ('approve', 'needs_review', 'reject')),
     CONSTRAINT student_kyc_ai_confidence_check
@@ -321,7 +319,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_applications (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT vendor_applications_status_check
-        CHECK (status IN ('pending_review', 'approved', 'rejected')),
+        CHECK (status IN ('pending_review', 'approved', 'rejected', 'revoked')),
     CONSTRAINT vendor_applications_email_check
         CHECK (position('@' in email) > 1)
 );
@@ -381,10 +379,196 @@ FOR ALL
 USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin')
 WITH CHECK ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin');
 
+
+
+
+
+
+
+-- ============================================================
+-- ADDED FROM MIGRATIONS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.admin_actions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id uuid NOT NULL REFERENCES auth.users(id),
+    admin_email text NOT NULL,
+    action_type text NOT NULL,
+    target_type text NOT NULL CHECK (target_type IN ('student', 'vendor', 'deal')),
+    target_id uuid NOT NULL,
+    reason text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.admin_actions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Superadmin can select and insert audit logs"
+ON public.admin_actions
+FOR ALL
+USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin')
+WITH CHECK ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin');
+
+REVOKE UPDATE, DELETE ON public.admin_actions FROM authenticated, anon, public;
+
+CREATE OR REPLACE FUNCTION public.prevent_admin_actions_modification()
+RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'Modification of admin_actions is strictly prohibited. This is an append-only audit log.';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_append_only_admin_actions
+BEFORE UPDATE OR DELETE ON public.admin_actions
+FOR EACH ROW EXECUTE FUNCTION public.prevent_admin_actions_modification();
+
+
+CREATE TABLE IF NOT EXISTS public.saved_deals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    deal_id uuid NOT NULL REFERENCES public.deals(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT saved_deals_unique UNIQUE (user_id, deal_id)
+);
+
+CREATE INDEX IF NOT EXISTS saved_deals_user_id_idx ON public.saved_deals(user_id);
+
+ALTER TABLE public.saved_deals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own saved deals"
+ON public.saved_deals
+FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can save deals for themselves"
+ON public.saved_deals
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove their own saved deals"
+ON public.saved_deals
+FOR DELETE
+USING (auth.uid() = user_id);
+
+
+CREATE TABLE IF NOT EXISTS public.payments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    deal_id uuid NOT NULL REFERENCES public.deals(id),
+    checkout_request_id text NOT NULL UNIQUE,
+    merchant_request_id text NOT NULL,
+    amount numeric(10, 2) NOT NULL,
+    phone text NOT NULL,
+    status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'completed', 'failed')),
+    mpesa_receipt text,
+    result_code integer,
+    result_description text,
+    order_id uuid REFERENCES public.orders(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS payments_user_id_idx ON public.payments(user_id);
+CREATE INDEX IF NOT EXISTS payments_checkout_request_id_idx ON public.payments(checkout_request_id);
+
+CREATE TRIGGER payments_set_updated_at
+BEFORE UPDATE ON public.payments
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own payments"
+ON public.payments
+FOR SELECT
+USING (auth.uid() = user_id);
+
+
+CREATE OR REPLACE FUNCTION public.create_order_after_payment(
+    p_user_id uuid,
+    p_deal_id uuid,
+    p_order_date text,
+    p_order_time text,
+    p_total_paid numeric
+)
+RETURNS public.orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_deal public.deals%ROWTYPE;
+    v_order public.orders%ROWTYPE;
+    v_pickup_code text;
+BEGIN
+    SELECT * INTO v_deal
+    FROM public.deals
+    WHERE id = p_deal_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Deal not found';
+    END IF;
+
+    IF v_deal.stock_count <= 0 THEN
+        RAISE EXCEPTION 'SOLD_OUT';
+    END IF;
+
+    UPDATE public.deals
+       SET stock_count = stock_count - 1
+     WHERE id = p_deal_id;
+
+    v_pickup_code := lpad(floor(random() * 1000000)::text, 6, '0');
+
+    INSERT INTO public.orders (
+        user_id, deal_id, order_date, order_time, status, total_paid, pickup_code
+    ) VALUES (
+        p_user_id, p_deal_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code
+    )
+    RETURNING * INTO v_order;
+
+    RETURN v_order;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.create_order_after_payment(uuid, uuid, text, text, numeric) FROM PUBLIC;
+
+
+CREATE OR REPLACE FUNCTION public.unpublish_expired_deals()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.deals
+       SET is_published = false
+     WHERE is_published = true
+       AND expires_at <= now();
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.unpublish_expired_deals() TO authenticated, anon;
+
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    -- Inject role: 'student' into app_metadata automatically
+    NEW.raw_app_meta_data = coalesce(NEW.raw_app_meta_data, '{}'::jsonb) || '{"role": "student"}'::jsonb;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
 CREATE OR REPLACE FUNCTION public.review_student_kyc_application(
     p_application_id uuid,
     p_status text,
-    p_admin_notes text DEFAULT NULL
+    p_admin_notes text DEFAULT NULL,
+    p_admin_id uuid DEFAULT NULL,
+    p_admin_email text DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -393,12 +577,14 @@ SET search_path = public
 AS $$
 DECLARE
     v_student_id uuid;
+    v_actual_admin_id uuid;
+    v_actual_admin_email text;
 BEGIN
     IF auth.role() != 'service_role' AND (auth.jwt() -> 'app_metadata' ->> 'role') IS DISTINCT FROM 'superadmin' THEN
         RAISE EXCEPTION 'Access denied: superadmin role required';
     END IF;
 
-    IF p_status NOT IN ('approved', 'rejected') THEN
+    IF p_status NOT IN ('approved', 'rejected', 'revoked') THEN
         RAISE EXCEPTION 'Invalid KYC review status: %', p_status;
     END IF;
 
@@ -417,14 +603,39 @@ BEGIN
         UPDATE public.student_profiles
            SET is_verified = true
          WHERE id = v_student_id;
+    ELSIF p_status = 'revoked' THEN
+        UPDATE public.student_profiles
+           SET is_verified = false
+         WHERE id = v_student_id;
     END IF;
+    
+    v_actual_admin_id := COALESCE(auth.uid(), p_admin_id);
+    v_actual_admin_email := COALESCE(auth.jwt() ->> 'email', p_admin_email);
+    
+    IF v_actual_admin_id IS NULL THEN
+        RAISE EXCEPTION 'Audit logging requires an admin_id';
+    END IF;
+
+    INSERT INTO public.admin_actions (
+        admin_id, admin_email, action_type, target_type, target_id, reason
+    ) VALUES (
+        v_actual_admin_id,
+        COALESCE(v_actual_admin_email, 'unknown_admin_email'),
+        p_status,
+        'student',
+        v_student_id,
+        p_admin_notes
+    );
 END;
 $$;
+
 
 CREATE OR REPLACE FUNCTION public.review_vendor_application(
     p_application_id uuid,
     p_status text,
-    p_admin_notes text DEFAULT NULL
+    p_admin_notes text DEFAULT NULL,
+    p_admin_id uuid DEFAULT NULL,
+    p_admin_email text DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -434,12 +645,14 @@ AS $$
 DECLARE
     v_app public.vendor_applications%ROWTYPE;
     v_user_id uuid;
+    v_actual_admin_id uuid;
+    v_actual_admin_email text;
 BEGIN
     IF auth.role() != 'service_role' AND (auth.jwt() -> 'app_metadata' ->> 'role') IS DISTINCT FROM 'superadmin' THEN
         RAISE EXCEPTION 'Access denied: superadmin role required';
     END IF;
 
-    IF p_status NOT IN ('approved', 'rejected') THEN
+    IF p_status NOT IN ('approved', 'rejected', 'revoked') THEN
         RAISE EXCEPTION 'Invalid vendor review status: %', p_status;
     END IF;
 
@@ -451,39 +664,26 @@ BEGIN
         RAISE EXCEPTION 'Vendor application not found.';
     END IF;
 
-    IF p_status = 'approved' THEN
-        v_user_id := v_app.auth_user_id;
+    v_user_id := v_app.auth_user_id;
 
-        IF v_user_id IS NULL THEN
-            SELECT id INTO v_user_id
-              FROM auth.users
-             WHERE email = v_app.email
-             LIMIT 1;
-        END IF;
+    IF v_user_id IS NULL THEN
+        SELECT id INTO v_user_id
+          FROM auth.users
+         WHERE email = v_app.email
+         LIMIT 1;
+    END IF;
 
-        IF v_user_id IS NOT NULL THEN
-            UPDATE public.vendor_applications
-               SET auth_user_id = v_user_id
-             WHERE id = p_application_id;
+    IF v_user_id IS NOT NULL THEN
+        UPDATE public.vendor_applications
+           SET auth_user_id = v_user_id
+         WHERE id = p_application_id;
+         
+        IF p_status = 'approved' THEN
             INSERT INTO public.vendors (
-                id,
-                business_name,
-                contact_name,
-                email,
-                phone,
-                address,
-                campus_proximity,
-                status
+                id, business_name, contact_name, email, phone, address, campus_proximity, status
             )
             VALUES (
-                v_user_id,
-                v_app.business_name,
-                v_app.contact_name,
-                v_app.email,
-                v_app.phone,
-                v_app.address,
-                v_app.campus_proximity,
-                'approved'
+                v_user_id, v_app.business_name, v_app.contact_name, v_app.email, v_app.phone, v_app.address, v_app.campus_proximity, 'approved'
             )
             ON CONFLICT (id) DO UPDATE
             SET business_name = EXCLUDED.business_name,
@@ -493,6 +693,10 @@ BEGIN
                 address = EXCLUDED.address,
                 campus_proximity = EXCLUDED.campus_proximity,
                 status = 'approved';
+        ELSIF p_status = 'revoked' THEN
+            UPDATE public.vendors
+               SET status = 'revoked'
+             WHERE id = v_user_id;
         END IF;
     END IF;
 
@@ -501,11 +705,27 @@ BEGIN
            admin_notes = p_admin_notes,
            reviewed_at = now()
      WHERE id = p_application_id;
+     
+    v_actual_admin_id := COALESCE(auth.uid(), p_admin_id);
+    v_actual_admin_email := COALESCE(auth.jwt() ->> 'email', p_admin_email);
+    
+    IF v_actual_admin_id IS NULL THEN
+        RAISE EXCEPTION 'Audit logging requires an admin_id';
+    END IF;
+
+    INSERT INTO public.admin_actions (
+        admin_id, admin_email, action_type, target_type, target_id, reason
+    ) VALUES (
+        v_actual_admin_id,
+        COALESCE(v_actual_admin_email, 'unknown_admin_email'),
+        p_status,
+        'vendor',
+        v_user_id,
+        p_admin_notes
+    );
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.review_student_kyc_application(uuid, text, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.review_vendor_application(uuid, text, text) TO authenticated;
-
-
+GRANT EXECUTE ON FUNCTION public.review_student_kyc_application(uuid, text, text, uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.review_vendor_application(uuid, text, text, uuid, text) TO authenticated;
 

@@ -18,7 +18,7 @@ export const mockDeals: Deal[] = [
     briefDescription: "A premium selection of today's surplus savory pastries and breads.",
     detailedDescription: "Secure this Flash Deal! This mystery bag typically contains a mix of 3-4 items from today's surplus, potentially including almond croissants, sourdough loaves, or gourmet muffins.",
     stockCount: 3,
-    durationRemaining: '01:24:52',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'pizza-mystery-bag',
@@ -37,7 +37,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'A surprise assortment of piping hot pizza slices from our dinner batch.',
     detailedDescription: 'Secure this Flash Deal! This mystery bag typically contains 3-4 random slices of premium pizza. You might find bubbling mozzarella, rich pepperoni, or supreme veggie toppings.',
     stockCount: 5,
-    durationRemaining: '00:45:10',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'sushi-mystery-box',
@@ -56,7 +56,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'An assortment of premium sushi rolls and sashimi saved from the afternoon prep.',
     detailedDescription: 'Secure this Flash Deal! This mystery box contains a delicate arrangement of premium sushi rolls and fresh sashimi prepared by master chefs. The exact mix is a surprise.',
     stockCount: 2,
-    durationRemaining: '01:05:15',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'burger-mystery-bag',
@@ -75,7 +75,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'A hearty surprise combo of burgers and sides.',
     detailedDescription: 'Secure this Flash Deal! This mystery bag may contain any combination of our signature burgers, sides, and snacks that were over-prepped.',
     stockCount: 4,
-    durationRemaining: '00:30:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'java-lunch-combo',
@@ -94,7 +94,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'A fresh sandwich and side salad from our lunch rush.',
     detailedDescription: 'Perfect afternoon fuel. Might include a BLT or chicken mayo sandwich with a side of garden salad. High quality cafe food at a student price.',
     stockCount: 6,
-    durationRemaining: '00:55:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'kfc-chicken-pack',
@@ -113,7 +113,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'A mix of original recipe chicken pieces and chips.',
     detailedDescription: 'Surplus chicken from the dinner rush. Contains at least 2 pieces of chicken and a portion of chips. Must be collected before closing.',
     stockCount: 8,
-    durationRemaining: '01:10:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'local-pilau-deal',
@@ -132,7 +132,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'Authentic spiced beef pilau with a side of fresh kachumbari.',
     detailedDescription: 'The best local food around campus! We have a few extra plates of our famous pilau today. Come grab it before it is gone.',
     stockCount: 12,
-    durationRemaining: '00:20:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'vegan-wrap-surprise',
@@ -151,7 +151,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'A surprise vegan wrap plus a cold pressed juice or smoothie.',
     detailedDescription: 'Plant-based goodness at a fraction of the cost. May contain falafel, hummus, or grilled vegetable wraps paired with a detox juice.',
     stockCount: 4,
-    durationRemaining: '02:00:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'dessert-box',
@@ -170,7 +170,7 @@ export const mockDeals: Deal[] = [
     briefDescription: 'End of day ice cream cakes, brownies, and cookies.',
     detailedDescription: 'Satisfy your sweet tooth with our end of day baked goods and pre-packed dessert cups. A fantastic late night study snack.',
     stockCount: 3,
-    durationRemaining: '01:45:00',
+    expiresAt: new Date().toISOString(),
   },
   {
     id: 'chapati-beans',
@@ -189,6 +189,6 @@ export const mockDeals: Deal[] = [
     briefDescription: 'Two soft chapatis with a rich beans stew.',
     detailedDescription: 'Ultimate student survival meal. We made too much for lunch, so grab this filling classic for almost nothing.',
     stockCount: 15,
-    durationRemaining: '00:15:00',
+    expiresAt: new Date().toISOString(),
   }
 ];

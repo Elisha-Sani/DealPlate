@@ -25,6 +25,17 @@ function PendingPaymentsPanel({ onConfirmed }: { onConfirmed: () => void }) {
 
   useEffect(() => {
     load();
+
+    const mpesaChannel = supabase
+      .channel('vendor_mpesa_payments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mpesa_payments' }, () => {
+        load();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(mpesaChannel);
+    };
   }, [load]);
 
   const handleConfirm = async (paymentId: string) => {
@@ -118,7 +129,7 @@ export default function VendorOrders() {
       .from('orders')
       .select(
         `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
-         deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, duration_remaining),
+         deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, expires_at),
          student:user_id(full_name, phone, university)`
       )
       .order('created_at', { ascending: false });
@@ -144,7 +155,7 @@ export default function VendorOrders() {
           timeEnd: o.deal.time_end,
           category: o.deal.category,
           stockCount: o.deal.stock_count,
-          durationRemaining: o.deal.duration_remaining
+          expiresAt: o.deal.expires_at
         } as Deal,
         student: o.student ? {
           full_name: o.student.full_name,

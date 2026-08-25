@@ -11,7 +11,7 @@ import { useSavedDeals } from '@/hooks/useSavedDeals';
 import Price from '@/components/ui/Price';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import Timer from '@/components/ui/Timer';
-import { cn, mapSupabaseDeal, parseDurationToSeconds } from '@/lib/utils';
+import { cn, mapSupabaseDeal, secondsUntil } from '@/lib/utils';
 import type { Deal } from '@/types';
 
 export default function DealDetailsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -174,7 +174,7 @@ export default function DealDetailsPage({ params }: { params: Promise<{ id: stri
               <div className="flex items-center gap-1.5 text-sm text-[#5a4136]">
                 <Clock className="w-4 h-4 text-gray-400" />
                 <span className="font-semibold">Ends in</span>
-                <Timer initialSeconds={parseDurationToSeconds(deal.durationRemaining)} variant="inline" />
+                <Timer initialSeconds={secondsUntil(deal.expiresAt)} variant="inline" />
               </div>
             </div>
 

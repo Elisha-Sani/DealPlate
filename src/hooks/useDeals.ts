@@ -72,10 +72,7 @@ export function useDeals(): UseDealsReturn {
       const matchesCampus =
         selectedCampus === 'all' ||
         deal.campus.toLowerCase() === selectedCampus.toLowerCase();
-      const hasStock = deal.stockCount > 0;
-      const isPublished = deal.isPublished !== false;
-
-      return isPublished && hasStock && matchesSearch && matchesCampus;
+      return matchesSearch && matchesCampus;
     });
   }, [deals, searchQuery, selectedCampus]);
 
