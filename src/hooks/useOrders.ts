@@ -15,12 +15,17 @@ interface UseOrdersReturn {
   isLoading: boolean;
 }
 
-export function useOrders(): UseOrdersReturn {
+export function useOrders(initialPastOrders?: Order[], initialActiveOrder?: Order | null): UseOrdersReturn {
   const { user } = useUser();
-  const [pastOrders, setPastOrders] = useState<Order[]>([]);
-  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
+  const [pastOrders, setPastOrders] = useState<Order[]>(initialPastOrders || []);
+  const [activeOrder, setActiveOrder] = useState<Order | null>(initialActiveOrder || null);
   const [ticketSeconds, setTicketSeconds] = useState(PICKUP_WINDOW_SECONDS);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialPastOrders);
+
+  useEffect(() => {
+    if (initialPastOrders) setPastOrders(initialPastOrders);
+    if (initialActiveOrder !== undefined) setActiveOrder(initialActiveOrder);
+  }, [initialPastOrders, initialActiveOrder]);
 
   useEffect(() => {
     async function fetchOrders() {

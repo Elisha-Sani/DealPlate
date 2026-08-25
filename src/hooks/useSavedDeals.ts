@@ -14,11 +14,16 @@ interface UseSavedDealsReturn {
   toggleSaved: (dealId: string) => Promise<void>;
 }
 
-export function useSavedDeals(): UseSavedDealsReturn {
+export function useSavedDeals(initialSavedDeals?: Deal[], initialSavedDealIds?: Set<string>): UseSavedDealsReturn {
   const { user } = useUser();
-  const [savedDealIds, setSavedDealIds] = useState<Set<string>>(new Set());
-  const [savedDeals, setSavedDeals] = useState<Deal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [savedDealIds, setSavedDealIds] = useState<Set<string>>(initialSavedDealIds || new Set());
+  const [savedDeals, setSavedDeals] = useState<Deal[]>(initialSavedDeals || []);
+  const [isLoading, setIsLoading] = useState(!initialSavedDeals);
+
+  useEffect(() => {
+    if (initialSavedDeals) setSavedDeals(initialSavedDeals);
+    if (initialSavedDealIds) setSavedDealIds(initialSavedDealIds);
+  }, [initialSavedDeals, initialSavedDealIds]);
 
   const refresh = useCallback(async () => {
     if (!user?.id) {

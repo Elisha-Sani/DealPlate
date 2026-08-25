@@ -15,11 +15,17 @@ interface UseDealsReturn {
   setSelectedCampus: (c: string) => void;
 }
 
-export function useDeals(): UseDealsReturn {
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
+  const [deals, setDeals] = useState<Deal[]>(initialDeals || []);
+  const [isLoading, setIsLoading] = useState(!initialDeals);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCampus, setSelectedCampus] = useState('all');
+
+  useEffect(() => {
+    if (initialDeals) {
+      setDeals(initialDeals);
+    }
+  }, [initialDeals]);
 
   useEffect(() => {
     const fetchDeals = async () => {
