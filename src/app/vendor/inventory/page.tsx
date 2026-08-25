@@ -19,7 +19,7 @@ export default async function VendorInventoryPage() {
         .eq("id", session.user.id)
         .maybeSingle();
 
-    let initialItems = [];
+    let initialItems: any[] = [];
 
     if (vendorData) {
         const { data: dealsData } = await supabase

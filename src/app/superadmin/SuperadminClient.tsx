@@ -52,6 +52,7 @@ export default function SuperadminClient({
   initialAuditLog,
   initialOverviewStats,
   isUnlocked,
+  hasSession,
 }: {
   initialStudentApps: StudentKycApplication[];
   initialVendorApps: VendorApplication[];
@@ -59,6 +60,7 @@ export default function SuperadminClient({
   initialAuditLog: AdminActionRow[];
   initialOverviewStats: AdminOverviewStats;
   isUnlocked: boolean;
+  hasSession: boolean;
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -328,7 +330,7 @@ export default function SuperadminClient({
           <h1 className="text-2xl font-bold text-[#1E293B] mb-2">Superadmin</h1>
           <p className="text-sm text-gray-500 mb-6">Sign in to access the KYC and vendor queues.</p>
 
-          {session && !isSuperadmin ? (
+          {hasSession && !isUnlocked ? (
             <div className="space-y-4">
               <p className="text-sm text-red-600 font-semibold">{message || "Not an admin account."}</p>
               <button onClick={signOut} className="text-sm font-semibold text-gray-500 hover:text-gray-900">

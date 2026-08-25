@@ -17,8 +17,9 @@ export default async function SuperadminPage() {
                 initialVendorApps={[]}
                 initialDeals={[]}
                 initialAuditLog={[]}
-                initialOverviewStats={{ totalStudents: 0, pendingStudents: 0, totalVendors: 0, pendingVendors: 0, activeDeals: 0 }}
-                isUnlocked={false}
+                initialOverviewStats={{ totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0 }}
+                isUnlocked={isSuperadmin}
+                hasSession={!!session}
             />
         );
     }
@@ -35,10 +36,11 @@ export default async function SuperadminPage() {
         <SuperadminClient
             initialStudentApps={students || []}
             initialVendorApps={vendors || []}
-            initialOverviewStats={overview.success ? overview.stats! : { totalStudents: 0, pendingStudents: 0, totalVendors: 0, pendingVendors: 0, activeDeals: 0 }}
+            initialOverviewStats={overview.success ? overview.stats! : { totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0 }}
             initialDeals={dealsResult.success ? dealsResult.deals! : []}
             initialAuditLog={auditResult.success ? auditResult.actions! : []}
             isUnlocked={true}
+            hasSession={!!session}
         />
     );
 }
