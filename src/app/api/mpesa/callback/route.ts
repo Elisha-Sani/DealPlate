@@ -1,5 +1,17 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+// Configure a rate limiter (e.g. 10 requests per 10 seconds) if ENV vars are present
+let ratelimit: Ratelimit | null = null;
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  ratelimit = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(10, '10 s'),
+    analytics: true,
+  });
+}
 
 // Safaricom's STK Push callback. This endpoint is unauthenticated by
 // necessity (it's called by Safaricom's servers, not a logged-in browser) —
@@ -15,6 +27,17 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 //      row (written server-side from the real deal price), never trusted
 //      from the callback body itself.
 export async function POST(request: Request) {
+  if (ratelimit) {
+    // We use the IP or a fallback identifier for the rate limit
+    const ip = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? '127.0.0.1';
+    const { success } = await ratelimit.limit(ip);
+    
+    if (!success) {
+      console.warn(`[mpesa callback] Rate limit exceeded for IP: ${ip}`);
+      return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+    }
+  }
+
   const body = await request.json().catch(() => null);
   const callback = body?.Body?.stkCallback;
 

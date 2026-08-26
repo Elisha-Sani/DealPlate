@@ -42,7 +42,9 @@ export default async function StudentExplorePage() {
     let initialActiveOrder: Order | null = null;
 
     if (ordersResult.data) {
-        const mappedOrders: Order[] = ordersResult.data.map((o: any) => ({
+        const mappedOrders: Order[] = ordersResult.data
+            .filter((o: any) => o.deal != null)
+            .map((o: any) => ({
             id: o.id,
             deal: {
                 id: o.deal.id,
