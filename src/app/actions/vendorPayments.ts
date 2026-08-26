@@ -45,13 +45,17 @@ export async function vendorGetPendingPayments(): Promise<{
       return { success: false, error: error.message };
     }
 
-    const payments: PendingPaymentRow[] = (data || []).map((row: any) => ({
-      id: row.id,
-      amount: Number(row.amount),
-      phone: row.phone,
-      created_at: row.created_at,
-      deal_title: row.deals?.title || 'Unknown deal',
-    }));
+    const dataTyped = (data || []) as Record<string, unknown>[];
+    const payments: PendingPaymentRow[] = dataTyped.map((row) => {
+      const deals = row.deals as Record<string, unknown> | null;
+      return {
+        id: String(row.id),
+        amount: Number(row.amount),
+        phone: String(row.phone),
+        created_at: String(row.created_at),
+        deal_title: deals?.title ? String(deals.title) : 'Unknown deal',
+      };
+    });
 
     return { success: true, payments };
   } catch (error: any) {

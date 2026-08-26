@@ -95,28 +95,7 @@ const categories = [
 const fallbackImage =
     "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=600&fit=crop&q=80";
 
-export function mapInventoryItem(row: any): InventoryItem {
-    return {
-        id: row.id,
-        title: row.title,
-        vendor: row.vendor,
-        campus: row.campus,
-        originalPrice: Number(row.original_price),
-        dealPrice: Number(row.deal_price),
-        image: row.image,
-        discountPercentage: Number(row.discount_percentage),
-        timeStart: String(row.time_start || "").slice(0, 5),
-        timeEnd: String(row.time_end || "").slice(0, 5),
-        category: row.category,
-        description: row.description || "",
-        briefDescription: row.brief_description || "",
-        detailedDescription: row.detailed_description || "",
-        stockCount: Number(row.stock_count),
-        isPublished: row.is_published !== false,
-        expiresAt: row.expires_at,
-        createdAt: row.created_at,
-    };
-}
+
 
 export default function InventoryClient({ 
     initialVendor, 

@@ -25,8 +25,11 @@ export default async function SavedDealsPage() {
     let initialSavedDealIds = new Set<string>();
 
     if (!error && data) {
-        initialSavedDealIds = new Set(data.map((row: any) => row.deal_id));
-        initialSavedDeals = data.filter((row: any) => row.deals).map((row: any) => mapSupabaseDeal(row.deals));
+        const dataTyped = data as Record<string, unknown>[];
+        initialSavedDealIds = new Set(dataTyped.map((row) => String(row.deal_id)));
+        initialSavedDeals = dataTyped
+            .filter((row) => row.deals)
+            .map((row) => mapSupabaseDeal(row.deals as Record<string, unknown>));
     }
 
     return (

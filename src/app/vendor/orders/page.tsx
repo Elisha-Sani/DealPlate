@@ -29,36 +29,45 @@ export default async function VendorOrdersPage() {
     let initialOrders: Order[] = [];
 
     if (ordersData) {
-        const ordersDataTyped = ordersData as any[];
-        initialOrders = ordersDataTyped.filter(o => o.deal).map(o => ({
-            id: o.id,
-            deal: {
-                id: o.deal.id,
-                title: o.deal.title,
-                vendor: o.deal.vendor,
-                campus: o.deal.campus,
-                originalPrice: Number(o.deal.original_price),
-                dealPrice: Number(o.deal.deal_price),
-                image: o.deal.image,
-                discountPercentage: o.deal.discount_percentage,
-                timeStart: o.deal.time_start,
-                timeEnd: o.deal.time_end,
-                category: o.deal.category,
-                stockCount: o.deal.stock_count,
-                expiresAt: o.deal.expires_at
-            } as Deal,
-            student: o.student ? {
-                full_name: o.student.full_name,
-                phone: o.student.phone,
-                university: o.student.university,
-            } : undefined,
-            date: o.order_date,
-            time: o.order_time,
-            status: o.status as any,
-            totalPaid: Number(o.total_paid),
-            pickupCode: o.pickup_code,
-            pickupDeadline: o.pickup_deadline
-        }));
+        const ordersDataTyped = ordersData as Record<string, unknown>[];
+        initialOrders = ordersDataTyped
+            .filter((o) => o.deal)
+            .map((o) => {
+                const deal = o.deal as Record<string, unknown>;
+                const student = o.student as Record<string, unknown> | undefined;
+
+                return {
+                    id: String(o.id),
+                    deal: {
+                        id: String(deal.id),
+                        title: String(deal.title),
+                        vendor: String(deal.vendor),
+                        campus: String(deal.campus),
+                        originalPrice: Number(deal.original_price),
+                        dealPrice: Number(deal.deal_price),
+                        image: String(deal.image),
+                        discountPercentage: Number(deal.discount_percentage),
+                        timeStart: String(deal.time_start),
+                        timeEnd: String(deal.time_end),
+                        category: String(deal.category),
+                        stockCount: Number(deal.stock_count),
+                        expiresAt: String(deal.expires_at),
+                    } as Deal,
+                    student: student
+                        ? {
+                              full_name: String(student.full_name),
+                              phone: String(student.phone),
+                              university: String(student.university),
+                          }
+                        : undefined,
+                    date: String(o.order_date),
+                    time: String(o.order_time),
+                    status: o.status as any,
+                    totalPaid: Number(o.total_paid),
+                    pickupCode: String(o.pickup_code),
+                    pickupDeadline: String(o.pickup_deadline),
+                };
+            });
     }
 
     return <OrdersClient initialOrders={initialOrders} />;

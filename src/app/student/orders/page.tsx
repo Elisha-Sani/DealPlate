@@ -27,32 +27,36 @@ export default async function StudentOrdersPage() {
     let initialActiveOrder: Order | null = null;
 
     if (!error && data) {
-        const mappedOrders: Order[] = data
-            .filter((o: any) => o.deal != null)
-            .map((o: any) => ({
-            id: o.id,
-            deal: {
-                id: o.deal.id,
-                title: o.deal.title,
-                vendor: o.deal.vendor,
-                campus: o.deal.campus,
-                originalPrice: o.deal.original_price,
-                dealPrice: o.deal.deal_price,
-                image: o.deal.image,
-                discountPercentage: o.deal.discount_percentage,
-                timeStart: o.deal.time_start,
-                timeEnd: o.deal.time_end,
-                category: o.deal.category,
-                stockCount: o.deal.stock_count,
-                expiresAt: o.deal.expires_at
-            } as Deal,
-            date: o.order_date,
-            time: o.order_time,
-            status: o.status,
-            totalPaid: Number(o.total_paid),
-            pickupCode: o.pickup_code,
-            pickupDeadline: o.pickup_deadline
-        }));
+        const dataTyped = data as Record<string, unknown>[];
+        const mappedOrders: Order[] = dataTyped
+            .filter((o) => o.deal != null)
+            .map((o) => {
+                const deal = o.deal as Record<string, unknown>;
+                return {
+                    id: String(o.id),
+                    deal: {
+                        id: String(deal.id),
+                        title: String(deal.title),
+                        vendor: String(deal.vendor),
+                        campus: String(deal.campus),
+                        originalPrice: Number(deal.original_price),
+                        dealPrice: Number(deal.deal_price),
+                        image: String(deal.image),
+                        discountPercentage: Number(deal.discount_percentage),
+                        timeStart: String(deal.time_start),
+                        timeEnd: String(deal.time_end),
+                        category: String(deal.category),
+                        stockCount: Number(deal.stock_count),
+                        expiresAt: String(deal.expires_at),
+                    } as Deal,
+                    date: String(o.order_date),
+                    time: String(o.order_time),
+                    status: o.status as any,
+                    totalPaid: Number(o.total_paid),
+                    pickupCode: String(o.pickup_code),
+                    pickupDeadline: String(o.pickup_deadline),
+                };
+            });
         const active = mappedOrders.find(o => o.status === 'Active') || null;
         initialActiveOrder = active;
         initialPastOrders = mappedOrders.filter(o => o.id !== active?.id);

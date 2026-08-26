@@ -40,8 +40,13 @@ export function useSavedDeals(initialSavedDeals?: Deal[], initialSavedDealIds?: 
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setSavedDealIds(new Set(data.map((row: any) => row.deal_id)));
-      setSavedDeals(data.filter((row: any) => row.deals).map((row: any) => mapSupabaseDeal(row.deals)));
+      const dataTyped = data as Record<string, unknown>[];
+      setSavedDealIds(new Set(dataTyped.map((row) => String(row.deal_id))));
+      setSavedDeals(
+          dataTyped
+              .filter((row) => row.deals)
+              .map((row) => mapSupabaseDeal(row.deals as Record<string, unknown>))
+      );
     } else {
       setSavedDealIds(new Set());
       setSavedDeals([]);
@@ -55,9 +60,12 @@ export function useSavedDeals(initialSavedDeals?: Deal[], initialSavedDealIds?: 
 
   const isSaved = useCallback((dealId: string) => savedDealIds.has(dealId), [savedDealIds]);
 
-  const toggleSaved = useCallback(
-    async (dealId: string) => {
-      if (!user?.id) return;
+    const toggleSaved = useCallback(
+      async (dealId: string) => {
+        if (!user?.id) {
+          window.location.href = '/student/sign-in';
+          return;
+        }
 
       if (savedDealIds.has(dealId)) {
         setSavedDealIds((prev) => {

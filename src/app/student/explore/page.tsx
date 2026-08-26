@@ -11,19 +11,15 @@ export default async function StudentExplorePage() {
         data: { session },
     } = await supabase.auth.getSession();
 
-    if (!session?.user?.id) {
-        redirect("/student/sign-in");
-    }
+    const dealsPromise = supabase
+        .from('deals')
+        .select('*')
+        .eq('is_published', true)
+        .gt('stock_count', 0)
+        .order('created_at', { ascending: false });
 
-    const [dealsResult, ordersResult] = await Promise.all([
-        supabase
-            .from('deals')
-            .select('*')
-            .eq('is_published', true)
-            .gt('stock_count', 0)
-            .order('created_at', { ascending: false }),
-            
-        supabase
+    const ordersPromise = session?.user?.id
+        ? supabase
             .from('orders')
             .select(`
                 *,
@@ -31,7 +27,9 @@ export default async function StudentExplorePage() {
             `)
             .eq('user_id', session.user.id)
             .order('created_at', { ascending: false })
-    ]);
+        : Promise.resolve({ data: null, error: null });
+
+    const [dealsResult, ordersResult] = await Promise.all([dealsPromise, ordersPromise]);
 
     let initialDeals: Deal[] = [];
     if (dealsResult.data) {
@@ -42,32 +40,36 @@ export default async function StudentExplorePage() {
     let initialActiveOrder: Order | null = null;
 
     if (ordersResult.data) {
-        const mappedOrders: Order[] = ordersResult.data
-            .filter((o: any) => o.deal != null)
-            .map((o: any) => ({
-            id: o.id,
-            deal: {
-                id: o.deal.id,
-                title: o.deal.title,
-                vendor: o.deal.vendor,
-                campus: o.deal.campus,
-                originalPrice: o.deal.original_price,
-                dealPrice: o.deal.deal_price,
-                image: o.deal.image,
-                discountPercentage: o.deal.discount_percentage,
-                timeStart: o.deal.time_start,
-                timeEnd: o.deal.time_end,
-                category: o.deal.category,
-                stockCount: o.deal.stock_count,
-                expiresAt: o.deal.expires_at
-            } as Deal,
-            date: o.order_date,
-            time: o.order_time,
-            status: o.status,
-            totalPaid: Number(o.total_paid),
-            pickupCode: o.pickup_code,
-            pickupDeadline: o.pickup_deadline
-        }));
+        const ordersDataTyped = ordersResult.data as Record<string, unknown>[];
+        const mappedOrders: Order[] = ordersDataTyped
+            .filter((o) => o.deal != null)
+            .map((o) => {
+                const deal = o.deal as Record<string, unknown>;
+                return {
+                    id: String(o.id),
+                    deal: {
+                        id: String(deal.id),
+                        title: String(deal.title),
+                        vendor: String(deal.vendor),
+                        campus: String(deal.campus),
+                        originalPrice: Number(deal.original_price),
+                        dealPrice: Number(deal.deal_price),
+                        image: String(deal.image),
+                        discountPercentage: Number(deal.discount_percentage),
+                        timeStart: String(deal.time_start),
+                        timeEnd: String(deal.time_end),
+                        category: String(deal.category),
+                        stockCount: Number(deal.stock_count),
+                        expiresAt: String(deal.expires_at),
+                    } as Deal,
+                    date: String(o.order_date),
+                    time: String(o.order_time),
+                    status: o.status as any,
+                    totalPaid: Number(o.total_paid),
+                    pickupCode: String(o.pickup_code),
+                    pickupDeadline: String(o.pickup_deadline),
+                };
+            });
         
         const active = mappedOrders.find(o => o.status === 'Active') || null;
         initialActiveOrder = active;

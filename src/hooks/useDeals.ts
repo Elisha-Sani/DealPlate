@@ -13,6 +13,10 @@ interface UseDealsReturn {
   setSearchQuery: (q: string) => void;
   selectedCampus: string;
   setSelectedCampus: (c: string) => void;
+  selectedCategory: string;
+  setSelectedCategory: (c: string) => void;
+  sortBy: string;
+  setSortBy: (s: string) => void;
 }
 
 export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
@@ -20,6 +24,8 @@ export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
   const [isLoading, setIsLoading] = useState(!initialDeals);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCampus, setSelectedCampus] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState('ending_soon'); // 'ending_soon' | 'price_low' | 'discount_high'
 
   useEffect(() => {
     if (initialDeals) {
@@ -68,7 +74,7 @@ export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
   }, []);
 
   const filteredDeals = useMemo(() => {
-    return deals.filter((deal) => {
+    let result = deals.filter((deal) => {
       const q = searchQuery.toLowerCase();
       const matchesSearch =
         deal.title.toLowerCase().includes(q) ||
@@ -78,9 +84,27 @@ export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
       const matchesCampus =
         selectedCampus === 'all' ||
         deal.campus.toLowerCase() === selectedCampus.toLowerCase();
-      return matchesSearch && matchesCampus;
+        
+      const matchesCategory = 
+        selectedCategory === 'All' ||
+        deal.category.toLowerCase() === selectedCategory.toLowerCase();
+        
+      return matchesSearch && matchesCampus && matchesCategory;
     });
-  }, [deals, searchQuery, selectedCampus]);
+    
+    result.sort((a, b) => {
+      if (sortBy === 'price_low') {
+        return a.dealPrice - b.dealPrice;
+      } else if (sortBy === 'discount_high') {
+        return b.discountPercentage - a.discountPercentage;
+      } else {
+        // default: ending_soon
+        return new Date(a.expiresAt).getTime() - new Date(b.expiresAt).getTime();
+      }
+    });
+    
+    return result;
+  }, [deals, searchQuery, selectedCampus, selectedCategory, sortBy]);
 
   return {
     deals,
@@ -90,6 +114,10 @@ export function useDeals(initialDeals?: Deal[]): UseDealsReturn {
     setSearchQuery,
     selectedCampus,
     setSelectedCampus,
+    selectedCategory,
+    setSelectedCategory,
+    sortBy,
+    setSortBy,
   };
 }
 

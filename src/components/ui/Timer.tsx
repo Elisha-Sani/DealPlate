@@ -21,7 +21,7 @@ export default function Timer({
 
   if (variant === 'inline') {
     return (
-      <span className={cn('font-bold text-[#111827] tabular-nums', className)}>
+      <span suppressHydrationWarning className={cn('font-bold text-[#111827] tabular-nums', className)}>
         {formatted}
       </span>
     );
@@ -35,7 +35,7 @@ export default function Timer({
           className
         )}
       >
-        <div className="text-4xl font-display font-extrabold text-[#E11D48] tracking-widest tabular-nums animate-pulse">
+        <div suppressHydrationWarning className="text-4xl font-display font-extrabold text-[#E11D48] tracking-widest tabular-nums animate-pulse">
           {formatted}
         </div>
       </div>
@@ -50,7 +50,7 @@ export default function Timer({
       )}
     >
       <Clock className="w-3.5 h-3.5 text-[#FF6B00]" />
-      <span className="tabular-nums">{formatted}</span>
+      <span suppressHydrationWarning className="tabular-nums">{formatted}</span>
     </div>
   );
 }
