@@ -128,6 +128,24 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
+    if (role === 'vendor' && path !== '/vendor/pending') {
+      const vendorStatus = user?.app_metadata?.vendor_status
+      if (vendorStatus === 'pending_review' || vendorStatus === 'rejected') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/vendor/pending'
+        return NextResponse.redirect(url)
+      }
+    }
+
+    if (role === 'vendor' && path === '/vendor/pending') {
+      const vendorStatus = user?.app_metadata?.vendor_status
+      if (vendorStatus === 'approved') {
+        const url = request.nextUrl.clone()
+        url.pathname = '/vendor/dashboard'
+        return NextResponse.redirect(url)
+      }
+    }
+
     if (isStudentRoute && role !== 'student') {
       const url = request.nextUrl.clone()
       url.pathname = role === 'superadmin' ? '/superadmin' : '/vendor/dashboard'

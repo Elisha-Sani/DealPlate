@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { Settings, ShieldAlert, Bell, Mail } from 'lucide-react';
+import { Settings, Clock } from 'lucide-react';
 
 export function SettingsTab() {
   return (
@@ -19,39 +19,15 @@ export function SettingsTab() {
           </div>
         </div>
 
-        <div className="space-y-4 max-w-2xl">
-          <div className="flex items-center justify-between p-4 border border-[#E2E8F0] rounded-lg">
-            <div className="flex items-center gap-3">
-              <ShieldAlert className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="font-bold text-[#1E293B]">Require KYC for Students</p>
-                <p className="text-sm text-gray-500">Students must verify email before ordering</p>
-              </div>
-            </div>
-            <input type="checkbox" className="toggle" defaultChecked />
-          </div>
-          
-          <div className="flex items-center justify-between p-4 border border-[#E2E8F0] rounded-lg">
-            <div className="flex items-center gap-3">
-              <Bell className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="font-bold text-[#1E293B]">Admin Notifications</p>
-                <p className="text-sm text-gray-500">Receive alerts for new vendor applications</p>
-              </div>
-            </div>
-            <input type="checkbox" className="toggle" defaultChecked />
-          </div>
-
-          <div className="flex items-center justify-between p-4 border border-[#E2E8F0] rounded-lg">
-            <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-gray-400" />
-              <div>
-                <p className="font-bold text-[#1E293B]">Support Email</p>
-                <p className="text-sm text-gray-500">Contact email for platform issues</p>
-              </div>
-            </div>
-            <input type="email" defaultValue="support@dealplate.com" className="h-9 px-3 border border-gray-200 rounded-md text-sm outline-none focus:ring-2 focus:ring-[#FF6B00]" />
-          </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center max-w-2xl border border-dashed border-[#E2E8F0] rounded-lg bg-gray-50/50">
+          <Clock className="w-8 h-8 text-gray-400 mb-3" />
+          <h3 className="text-lg font-bold text-[#1E293B] mb-2">Global Settings Coming Soon</h3>
+          <p className="text-sm text-gray-500 max-w-sm">
+            Platform-wide configuration (like pausing new vendor applications or toggling mandatory KYC) will be available in a future update. 
+          </p>
+          <p className="text-xs text-[#FF6B00] font-semibold mt-4">
+            Note: To reinstate (unrevoke) a user, locate their revoked application in the Student KYC or Vendors tab and click "Reinstate Access".
+          </p>
         </div>
       </div>
     </motion.div>
