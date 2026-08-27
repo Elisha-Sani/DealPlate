@@ -21,8 +21,9 @@ export default async function VendorDashboardPage() {
             .from('orders')
             .select(
                 `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
+                 deal_title, deal_vendor, deal_image, deal_original_price, deal_price,
                  deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, expires_at),
-                 student:user_id(full_name, phone, university)`
+                 student:student_profiles(full_name, phone, university)`
             )
             .order('created_at', { ascending: false }),
     ]);
@@ -56,9 +57,9 @@ export default async function VendorDashboardPage() {
     let initialOrders: Order[] = [];
     if (ordersData) {
         const ordersDataTyped = ordersData as any[];
-        initialOrders = ordersDataTyped.filter(o => o.deal).map(o => ({
-            id: o.id,
-            deal: {
+        initialOrders = ordersDataTyped.map(o => {
+            // Use snapshot data if deal is null
+            const dealObj = o.deal ? {
                 id: o.deal.id,
                 title: o.deal.title,
                 vendor: o.deal.vendor,
@@ -73,19 +74,39 @@ export default async function VendorDashboardPage() {
                 stockCount: o.deal.stock_count,
                 isPublished: o.deal.is_published !== false,
                 expiresAt: o.deal.expires_at
-            } as Deal,
-            student: o.student ? {
-                full_name: o.student.full_name,
-                phone: o.student.phone,
-                university: o.student.university,
-            } : undefined,
-            date: o.order_date,
-            time: o.order_time,
-            status: o.status as any,
-            totalPaid: Number(o.total_paid),
-            pickupCode: o.pickup_code,
-            pickupDeadline: o.pickup_deadline
-        }));
+            } : {
+                id: 'deleted',
+                title: o.deal_title,
+                vendor: o.deal_vendor,
+                campus: 'Unknown Campus',
+                originalPrice: Number(o.deal_original_price),
+                dealPrice: Number(o.deal_price),
+                image: o.deal_image,
+                discountPercentage: 0,
+                timeStart: '00:00',
+                timeEnd: '00:00',
+                category: 'Unknown',
+                stockCount: 0,
+                isPublished: false,
+                expiresAt: new Date().toISOString()
+            };
+            
+            return {
+                id: String(o.id),
+                deal: dealObj as Deal,
+                student: o.student ? {
+                    full_name: o.student.full_name,
+                    phone: o.student.phone,
+                    university: o.student.university,
+                } : undefined,
+                date: o.order_date,
+                time: o.order_time,
+                status: o.status as any,
+                totalPaid: Number(o.total_paid),
+                pickupCode: o.pickup_code,
+                pickupDeadline: o.pickup_deadline
+            };
+        });
     }
 
     return (

@@ -75,14 +75,92 @@ CREATE TABLE IF NOT EXISTS public.deals (
         CHECK (original_price > 0 AND deal_price > 0 AND deal_price <= original_price),
     CONSTRAINT deals_discount_percentage_check
         CHECK (discount_percentage BETWEEN 0 AND 100),
+-- DealPlate database schema for Supabase/PostgreSQL.
+-- Run this before seed.sql or 01-seed-mock-data.sql.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS public.vendors (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    business_name text NOT NULL,
+    contact_name text NOT NULL,
+    email text NOT NULL UNIQUE,
+    phone text NOT NULL,
+    address text NOT NULL,
+    campus_proximity text NOT NULL,
+    status text NOT NULL DEFAULT 'approved',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT vendors_status_check
+        CHECK (status IN ('pending_review', 'approved', 'suspended', 'revoked')),
+    CONSTRAINT vendors_email_check
+        CHECK (position('@' in email) > 1)
+);
+
+CREATE TABLE IF NOT EXISTS public.student_profiles (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name text NOT NULL,
+    phone text NOT NULL,
+    university text,
+    reg_number text UNIQUE,
+    is_verified boolean NOT NULL DEFAULT false,
+    id_photo_url text,
+    total_saved numeric(10, 2) NOT NULL DEFAULT 0,
+    meals_enjoyed integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT student_profiles_total_saved_check
+        CHECK (total_saved >= 0),
+    CONSTRAINT student_profiles_meals_enjoyed_check
+        CHECK (meals_enjoyed >= 0)
+);
+
+CREATE TABLE IF NOT EXISTS public.deals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    vendor_id uuid NOT NULL REFERENCES public.vendors(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    vendor text NOT NULL,
+    campus text NOT NULL,
+    original_price numeric(10, 2) NOT NULL,
+    deal_price numeric(10, 2) NOT NULL,
+    image text NOT NULL,
+    discount_percentage integer NOT NULL,
+    time_start time NOT NULL,
+    time_end time NOT NULL,
+    category text NOT NULL,
+    tags text[] NOT NULL DEFAULT ARRAY[]::text[],
+    description text,
+    brief_description text,
+    detailed_description text,
+    stock_count integer NOT NULL DEFAULT 0,
+    is_published boolean NOT NULL DEFAULT true,
+    expires_at timestamptz NOT NULL DEFAULT (now() + interval '2 hours'),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT deals_prices_check
+        CHECK (original_price > 0 AND deal_price > 0 AND deal_price <= original_price),
+    CONSTRAINT deals_discount_percentage_check
+        CHECK (discount_percentage BETWEEN 0 AND 100),
     CONSTRAINT deals_stock_count_check
-        CHECK (stock_count >= 0),
+        CHECK (stock_count >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS public.orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES public.student_profiles(id) ON DELETE CASCADE,
     deal_id uuid REFERENCES public.deals(id) ON DELETE SET NULL,
+    vendor_id uuid REFERENCES public.vendors(id) ON DELETE CASCADE,
     deal_title text NOT NULL DEFAULT 'Unavailable Deal',
     deal_vendor text NOT NULL DEFAULT 'Unknown',
     deal_image text NOT NULL DEFAULT '',
@@ -207,17 +285,12 @@ FOR ALL
 USING (vendor_id = auth.uid())
 WITH CHECK (vendor_id = auth.uid());
 
-CREATE POLICY "Users can view their own orders"
+CREATE POLICY "Users and Vendors can view their own orders"
 ON public.orders
 FOR SELECT
 USING (
     auth.uid() = user_id
-    OR EXISTS (
-        SELECT 1
-        FROM public.deals
-        WHERE deals.id = orders.deal_id
-          AND deals.vendor_id = auth.uid()
-    )
+    OR auth.uid() = vendor_id
 );
 
 CREATE POLICY "Users can insert their own orders"
@@ -225,25 +298,11 @@ ON public.orders
 FOR INSERT
 WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Vendors can update orders for their deals"
+CREATE POLICY "Vendors can update their own orders"
 ON public.orders
 FOR UPDATE
-USING (
-    EXISTS (
-        SELECT 1
-        FROM public.deals
-        WHERE deals.id = orders.deal_id
-          AND deals.vendor_id = auth.uid()
-    )
-)
-WITH CHECK (
-    EXISTS (
-        SELECT 1
-        FROM public.deals
-        WHERE deals.id = orders.deal_id
-          AND deals.vendor_id = auth.uid()
-    )
-);
+USING (auth.uid() = vendor_id)
+WITH CHECK (auth.uid() = vendor_id);
 
 DO $$
 BEGIN
@@ -526,9 +585,11 @@ BEGIN
     v_pickup_code := lpad(floor(random() * 1000000)::text, 6, '0');
 
     INSERT INTO public.orders (
-        user_id, deal_id, order_date, order_time, status, total_paid, pickup_code, deal_title, deal_vendor, deal_image, deal_original_price, deal_price
+        user_id, deal_id, vendor_id, order_date, order_time, status, total_paid, pickup_code,
+        deal_title, deal_vendor, deal_image, deal_original_price, deal_price
     ) VALUES (
-        p_user_id, p_deal_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code, v_deal.title, v_deal.vendor, v_deal.image, v_deal.original_price, v_deal.deal_price
+        p_user_id, p_deal_id, v_deal.vendor_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code,
+        v_deal.title, v_deal.vendor, v_deal.image, v_deal.original_price, v_deal.deal_price
     )
     RETURNING * INTO v_order;
 
@@ -536,6 +597,7 @@ BEGIN
 END;
 $$;
 REVOKE ALL ON FUNCTION public.create_order_after_payment(uuid, uuid, text, text, numeric) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.create_order_after_payment(uuid, uuid, text, text, numeric) TO authenticated;
 
 
 CREATE OR REPLACE FUNCTION public.unpublish_expired_deals()

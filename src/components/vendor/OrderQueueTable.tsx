@@ -63,11 +63,6 @@ export default function OrderQueueTable({ orders }: OrderQueueTableProps) {
                         onClick={() => setTab("collected")}
                     >
                         Collected ({collectedOrders.length})
-                    </button>
-                </div>
-                <select className="h-9 px-3 rounded-lg border border-[#E2E8F0] bg-white text-sm text-gray-600 outline-none">
-                    <option>Filter by Status</option>
-                </select>
             </div>
 
             <div className="overflow-x-auto">
