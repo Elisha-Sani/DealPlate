@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera } from 'lucide-react';
+import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera, Loader2, Save } from 'lucide-react';
 import { useUser } from '@/providers/UserProvider';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/lib/supabase/client';
@@ -18,6 +18,18 @@ export default function StudentProfile() {
   const [avatarPreview, setAvatarPreview] = useState<string>(user?.avatar || '');
   const [avatarStatus, setAvatarStatus] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [editName, setEditName] = useState(user?.fullName || '');
+  const [editPhone, setEditPhone] = useState(user?.phone || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      setEditName(user.fullName || '');
+      setEditPhone(user.phone || '');
+    }
+  }, [user]);
 
   if (!user) {
     return null;
@@ -72,6 +84,31 @@ export default function StudentProfile() {
     } catch (error) {
       console.error(error);
       setAvatarStatus('Photo could not be saved.');
+    }
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    const { error } = await supabase
+      .from('student_profiles')
+      .update({
+        full_name: editName,
+        phone: editPhone
+      })
+      .eq('id', user.id);
+
+    setIsSaving(false);
+
+    if (error) {
+      setSaveMessage({ text: 'Failed to update profile.', type: 'error' });
+    } else {
+      setUser((prev) => prev ? { ...prev, fullName: editName, phone: editPhone } : prev);
+      setSaveMessage({ text: 'Profile updated successfully.', type: 'success' });
     }
   };
 
@@ -130,6 +167,55 @@ export default function StudentProfile() {
             <span className="text-2xl font-extrabold tracking-tight text-[#111827]">{pastOrders.filter(o => o.status === 'Completed').length} meals</span>
           </div>
         </div>
+      </section>
+
+      <section className="bg-white border border-[#F3F4F6] rounded-xl p-5 shadow-sm space-y-4">
+        <h3 className="font-display font-extrabold text-lg text-[#111827]">Personal Information</h3>
+        
+        {saveMessage && (
+          <div className={`p-3 rounded-lg text-sm font-semibold border ${saveMessage.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+            {saveMessage.text}
+          </div>
+        )}
+
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Full Name</label>
+            <input
+              required
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Phone Number</label>
+            <input
+              required
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value)}
+              className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[#1E293B] mb-1.5">University</label>
+            <input
+              disabled
+              value={user.university || ''}
+              className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-gray-50 text-sm text-gray-400 cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-400 mt-1.5">To change your university, proof of enrollment is required. Contact support.</p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSaving || (editName === user.fullName && editPhone === user.phone)}
+            className="h-11 px-6 bg-[#FF6B00] disabled:bg-orange-300 text-white rounded-lg font-bold hover:bg-[#e66000] flex items-center gap-2 mt-2 transition-colors"
+          >
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save Changes
+          </button>
+        </form>
       </section>
 
       <section className="space-y-4">

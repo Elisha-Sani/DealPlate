@@ -63,6 +63,8 @@ export default function OrderQueueTable({ orders }: OrderQueueTableProps) {
                         onClick={() => setTab("collected")}
                     >
                         Collected ({collectedOrders.length})
+                    </button>
+                </div>
             </div>
 
             <div className="overflow-x-auto">

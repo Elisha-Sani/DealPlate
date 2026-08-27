@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import VendorSidebar from '@/components/layout/VendorSidebar';
+import VendorBottomNav from '@/components/layout/VendorBottomNav';
 import ErrorBoundary from '@/components/ui/ErrorBoundary';
 
 export default function VendorLayout({ children }: { children: React.ReactNode }) {
@@ -28,9 +29,10 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-[#1E293B] font-sans flex overflow-hidden">
       {!isAuthPage && <VendorSidebar />}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto relative">
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto relative pb-20 md:pb-0">
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
+      {!isAuthPage && <VendorBottomNav />}
     </div>
   );
 }
