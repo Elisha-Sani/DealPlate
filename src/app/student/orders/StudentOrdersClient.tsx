@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { CheckCircle2, Clock, ShoppingBag } from 'lucide-react';
 import { useOrders } from '@/hooks/useOrders';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -17,7 +18,6 @@ export default function StudentOrdersClient({
   initialPastOrders: Order[];
   initialActiveOrder: Order | null;
 }) {
-  const router = useRouter();
   const { pastOrders } = useOrders(initialPastOrders, initialActiveOrder);
   const [wasJustConfirmed, setWasJustConfirmed] = useState(false);
 
@@ -39,13 +39,12 @@ export default function StudentOrdersClient({
           <h2 className="font-display font-extrabold text-3xl tracking-tight text-[#111827] mb-1">Orders</h2>
           <p className="text-[#5a4136] text-sm">Track pickup codes, active meals, and past DealPlate saves.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => router.push('/student/explore')}
-          className="h-11 px-4 rounded-lg bg-[#FF6B00] text-white font-bold text-sm shadow-sm hover:bg-[#e66000] active:scale-95 transition-all"
+        <Link
+          href="/student/explore"
+          className="h-11 px-4 rounded-lg bg-[#FF6B00] text-white font-bold text-sm shadow-sm hover:bg-[#e66000] active:scale-95 transition-all flex items-center justify-center"
         >
           Browse Deals
-        </button>
+        </Link>
       </div>
 
       {wasJustConfirmed && (
@@ -65,13 +64,12 @@ export default function StudentOrdersClient({
           </div>
           <h3 className="font-display font-extrabold text-xl text-[#111827] mb-2">No orders yet</h3>
           <p className="text-sm text-gray-500 mb-5">Your confirmed pickups will appear here after checkout.</p>
-          <button
-            type="button"
-            onClick={() => router.push('/student/explore')}
-            className="h-11 px-5 rounded-lg border border-[#FF6B00] text-[#FF6B00] font-bold text-sm hover:bg-[#FF6B00]/5 active:scale-95 transition-all"
+          <Link
+            href="/student/explore"
+            className="h-11 px-5 rounded-lg border border-[#FF6B00] text-[#FF6B00] font-bold text-sm hover:bg-[#FF6B00]/5 active:scale-95 transition-all flex items-center justify-center inline-flex"
           >
             Find Flash Deals
-          </button>
+          </Link>
         </div>
       ) : (
         <>
@@ -81,7 +79,7 @@ export default function StudentOrdersClient({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {activeOrders.map((order) => (
                   <article key={order.id} className="bg-white border-2 border-[#FF6B00] rounded-xl p-4 shadow-sm flex gap-4">
-                    <img src={order.deal.image} alt={order.deal.title} className="w-20 h-20 rounded-lg object-cover border shrink-0" />
+                    <Image src={order.deal.image} alt={order.deal.title} width={80} height={80} className="rounded-lg object-cover border shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[10px] font-black uppercase tracking-wider bg-[#FF6B00]/10 text-[#FF6B00] px-2.5 py-0.5 rounded-full">{order.status}</span>
@@ -114,7 +112,7 @@ export default function StudentOrdersClient({
               ) : (
                 previousOrders.map((order) => (
                   <article key={order.id} className="bg-white border border-[#F3F4F6] rounded-xl p-4 shadow-sm flex gap-4 items-center">
-                    <img src={order.deal.image} alt={order.deal.title} className="w-14 h-14 rounded-lg object-cover border shrink-0" />
+                    <Image src={order.deal.image} alt={order.deal.title} width={56} height={56} className="rounded-lg object-cover border shrink-0" />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-display font-bold text-sm text-[#111827] truncate">{order.deal.title}</h4>
                       <p className="text-xs text-gray-400 mt-1">{order.date} &bull; {order.time}</p>

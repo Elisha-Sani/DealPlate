@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Heart } from 'lucide-react';
 import { useSavedDeals } from '@/hooks/useSavedDeals';
@@ -41,9 +42,9 @@ export default function SavedDealsClient({ initialSavedDeals, initialSavedDealId
           </div>
           <h3 className="font-display font-extrabold text-xl text-[#111827] mb-1">No saved deals yet</h3>
           <p className="text-sm text-gray-400 mb-4">Tap the heart icon on a deal to save it here for later.</p>
-          <button onClick={() => router.push('/student/explore')} className="text-sm font-bold text-[#FF6B00] hover:underline">
+          <Link href="/student/explore" className="text-sm font-bold text-[#FF6B00] hover:underline">
             Browse Deals
-          </button>
+          </Link>
         </div>
       ) : (
         <MarketplaceFeed deals={savedDeals} onSelectDeal={handleSelectDeal} onQuickReserve={handleQuickReserve} />

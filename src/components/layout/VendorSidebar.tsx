@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import {
   LayoutDashboard,
   Package,
@@ -19,7 +20,6 @@ const navItems = [
 ] as const;
 
 export default function VendorSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
 
   return (
@@ -41,11 +41,9 @@ export default function VendorSidebar() {
             (pathname === '/vendor/pickup' && item.path === '/vendor/dashboard');
 
           return (
-            <button
+            <Link
               key={item.path}
-              onClick={() => {
-                if (!item.path.startsWith('#')) router.push(item.path);
-              }}
+              href={item.path}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors border-l-4',
                 isActive
@@ -55,19 +53,19 @@ export default function VendorSidebar() {
             >
               <item.icon className="w-5 h-5" />
               {item.label}
-            </button>
+            </Link>
           );
         })}
       </nav>
 
       <div className="p-6">
-        <button
-          onClick={() => router.push('/vendor/inventory')}
+        <Link
+          href="/vendor/inventory"
           className="w-full bg-[#FF6B00] hover:bg-[#e66000] text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors"
         >
           <Plus className="w-5 h-5" />
           <span>New Item</span>
-        </button>
+        </Link>
       </div>
     </div>
   );

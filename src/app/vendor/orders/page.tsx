@@ -19,7 +19,7 @@ export default async function VendorOrdersPage() {
         .select(
             `id, order_date, order_time, status, total_paid, pickup_code, pickup_deadline,
              deal:deals(id, title, vendor, campus, original_price, deal_price, image, discount_percentage, time_start, time_end, category, stock_count, expires_at),
-             student:user_id(full_name, phone, university)`
+             student:student_profiles(full_name, phone, university)`
         )
         // Since we are fetching all orders, we need to filter by vendor.
         // Wait! The client component didn't filter by vendor? 

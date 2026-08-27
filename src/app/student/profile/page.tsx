@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera } from 'lucide-react';
 import { useUser } from '@/providers/UserProvider';
 import { useOrders } from '@/hooks/useOrders';
@@ -81,7 +83,11 @@ export default function StudentProfile() {
     >
       <section className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-sm flex flex-col items-center text-center relative">
         <div className="relative mb-4 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-          <img className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md transition-opacity group-hover:opacity-80" src={avatarPreview} alt={user.fullName} />
+          {avatarPreview ? (
+            <Image width={96} height={96} className="rounded-full object-cover border-4 border-white shadow-md transition-opacity group-hover:opacity-80 shrink-0" src={avatarPreview} alt={user.fullName} />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gray-200 border-4 border-white shadow-md" />
+          )}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Camera className="w-8 h-8 text-white drop-shadow-md" />
           </div>
@@ -99,9 +105,9 @@ export default function StudentProfile() {
             <span>Verified Student Status</span>
           </div>
         ) : (
-          <button onClick={() => router.push('/student/verify')} className="bg-[#E11D48] text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-[#c1153a]">
+          <Link href="/student/verify" className="bg-[#E11D48] text-white px-4 py-1.5 rounded-full text-xs font-bold hover:bg-[#c1153a]">
             Unverified Student Status
-          </button>
+          </Link>
         )}
       </section>
 
@@ -129,31 +135,34 @@ export default function StudentProfile() {
       <section className="space-y-4">
         <h3 className="font-display font-extrabold text-lg text-[#111827] ml-1">Past Transactions</h3>
         <div className="flex flex-col gap-3">
-          {pastOrders.map((order) => (
-            <div
-              key={order.id}
-              onClick={() => {
-                if (order.status === 'Active') router.push('/student/orders');
-              }}
-              className={`bg-white border border-[#F3F4F6] rounded-xl p-4 flex gap-4 items-center shadow-sm transition-all duration-150 ${
-                order.status === 'Active' ? 'border-[#FF6B00] bg-[#FFF8F6] cursor-pointer hover:shadow-md' : ''
-              }`}
-            >
-              <img src={order.deal.image} alt={order.deal.title} className="w-14 h-14 rounded-lg object-cover shrink-0 border" />
-              <div className="flex-1 min-w-0">
-                <h4 className="font-display font-bold text-sm text-[#111827] truncate">{order.deal.title}</h4>
-                <p className="text-xs text-gray-400 font-medium mt-1">{order.date} &bull; {order.time}</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0">
-                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
-                  order.status === 'Completed' ? 'bg-green-50 text-green-600'
-                  : order.status === 'Cancelled' ? 'bg-red-50 text-red-600'
-                  : 'bg-[#FF6B00]/10 text-[#FF6B00] animate-pulse'
-                }`}>{order.status}</span>
-                <Price amount={order.totalPaid} size="sm" />
-              </div>
-            </div>
-          ))}
+          {pastOrders.map((order) => {
+            const inner = (
+              <>
+                <Image src={order.deal.image} alt={order.deal.title} width={56} height={56} className="rounded-lg object-cover shrink-0 border" />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-display font-bold text-sm text-[#111827] truncate">{order.deal.title}</h4>
+                  <p className="text-xs text-gray-400 font-medium mt-1">{order.date} &bull; {order.time}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0">
+                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                    order.status === 'Completed' ? 'bg-green-50 text-green-600'
+                    : order.status === 'Cancelled' ? 'bg-red-50 text-red-600'
+                    : 'bg-[#FF6B00]/10 text-[#FF6B00] animate-pulse'
+                  }`}>{order.status}</span>
+                  <Price amount={order.totalPaid} size="sm" />
+                </div>
+              </>
+            );
+
+            const className = `bg-white border border-[#F3F4F6] rounded-xl p-4 flex gap-4 items-center shadow-sm transition-all duration-150 ${
+                order.status === 'Active' ? 'border-[#FF6B00] bg-[#FFF8F6] hover:shadow-md block' : ''
+              }`;
+
+            if (order.status === 'Active') {
+              return <Link key={order.id} href="/student/orders" className={className}>{inner}</Link>;
+            }
+            return <div key={order.id} className={className}>{inner}</div>;
+          })}
         </div>
       </section>
 

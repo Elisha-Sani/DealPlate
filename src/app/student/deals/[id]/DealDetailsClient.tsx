@@ -3,6 +3,8 @@
 import { use, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft, Heart, Share2, Store, Clock, MapPin, ShoppingBag } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useCart } from '@/providers/CartProvider';
@@ -59,9 +61,9 @@ export default function DealDetailsClient({
       <div className="max-w-md w-full mx-auto flex flex-col items-center text-center gap-3 py-20">
         <h2 className="font-display font-bold text-xl text-[#111827]">Deal not found</h2>
         <p className="text-sm text-gray-500">This deal may have sold out or been removed.</p>
-        <button onClick={() => router.push('/student/explore')} className="mt-2 text-sm font-bold text-[#FF6B00] hover:underline">
+        <Link href="/student/explore" className="mt-2 text-sm font-bold text-[#FF6B00] hover:underline">
           Back to Explore
-        </button>
+        </Link>
       </div>
     );
   }
@@ -75,10 +77,10 @@ export default function DealDetailsClient({
     >
       {/* Back + actions */}
       <div className="flex justify-between items-center">
-        <button onClick={() => router.push('/student/explore')} className="inline-flex items-center gap-1 text-sm font-semibold text-[#FF6B00] hover:underline">
+        <Link href="/student/explore" className="inline-flex items-center gap-1 text-sm font-semibold text-[#FF6B00] hover:underline">
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Feed</span>
-        </button>
+        </Link>
         <div className="flex items-center gap-2">
           {shareFeedback && <span className="text-xs font-semibold text-gray-500">{shareFeedback}</span>}
           <button
@@ -105,7 +107,7 @@ export default function DealDetailsClient({
       <div className="bg-white rounded-3xl border border-[#F3F4F6] overflow-hidden shadow-lg md:flex">
         {/* LEFT: Image */}
         <div className="relative aspect-video md:aspect-auto md:w-1/2 bg-[#F3F4F6] overflow-hidden shrink-0">
-          <img src={deal.image} alt={deal.title} className="w-full h-full object-cover" />
+          <Image src={deal.image} alt={deal.title} fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
           <div className="absolute top-6 left-6 bg-[#E11D48] text-white text-sm font-black px-4 py-2 rounded-full shadow-lg border border-[#E11D48]/50 backdrop-blur-sm">
             {deal.discountPercentage}% SAVINGS
           </div>

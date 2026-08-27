@@ -3,6 +3,7 @@
 import { useState, useCallback, useId } from "react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ShieldAlert, Eye, EyeOff, Loader2 } from "lucide-react";
 import type { SignUpFormData } from "@/types";
 import { supabase } from "@/lib/supabase/client";
@@ -313,12 +314,12 @@ export default function StudentSignUp() {
             </div>
 
             <div className="mt-6 text-center">
-                <button
-                    onClick={() => router.push("/student/sign-in")}
+                <Link
+                    href="/student/sign-in"
                     className="text-xs font-bold text-[#FF6B00] hover:underline"
                 >
                     Already have an account? Sign In
-                </button>
+                </Link>
             </div>
         </motion.div>
     );

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@/providers/UserProvider";
 import { cn } from "@/lib/utils";
 import DealPlateLogo from "@/components/logo/DealPlateLogo";
+import Link from "next/link";
 
 export default function StudentHeader() {
     const router = useRouter();
@@ -43,10 +44,9 @@ export default function StudentHeader() {
                                     pathname.startsWith(item.path + "/");
 
                                 return (
-                                    <button
+                                    <Link
                                         key={item.path}
-                                        type="button"
-                                        onClick={() => router.push(item.path)}
+                                        href={item.path}
                                         className={cn(
                                             "h-9 px-3 rounded-full flex items-center gap-2 text-xs font-bold transition-all",
                                             isActive
@@ -56,7 +56,7 @@ export default function StudentHeader() {
                                     >
                                         <item.icon className="w-4 h-4" />
                                         <span>{item.label}</span>
-                                    </button>
+                                    </Link>
                                 );
                             })}
                         </nav>
@@ -70,13 +70,12 @@ export default function StudentHeader() {
                     )}
 
                     {!user && !isAuthPage && (
-                        <button
-                            type="button"
-                            onClick={() => router.push(`/student/sign-in?next=${encodeURIComponent(pathname)}`)}
-                            className="h-9 px-4 rounded-full bg-[#FF6B00] text-white text-xs font-bold hover:bg-[#e66000] transition-colors shrink-0"
+                        <Link
+                            href={`/student/sign-in?next=${encodeURIComponent(pathname)}`}
+                            className="h-9 px-4 rounded-full bg-[#FF6B00] flex items-center justify-center text-white text-xs font-bold hover:bg-[#e66000] transition-colors shrink-0"
                         >
                             Sign In
-                        </button>
+                        </Link>
                     )}
                 </div>
             </div>

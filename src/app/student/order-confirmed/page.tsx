@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { CheckCircle2, QrCode, ShieldAlert } from 'lucide-react';
 import { useOrders } from '@/hooks/useOrders';
 import Price from '@/components/ui/Price';
@@ -15,9 +16,9 @@ export default function StudentOrderConfirmed() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="text-gray-500 font-medium mb-4">No active order found.</p>
-        <button onClick={() => router.push('/student/explore')} className="text-[#FF6B00] font-bold hover:underline">
+        <Link href="/student/explore" className="text-[#FF6B00] font-bold hover:underline">
           Browse Deals
-        </button>
+        </Link>
       </div>
     );
   }
@@ -75,13 +76,12 @@ export default function StudentOrderConfirmed() {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => router.push('/student/explore')}
+      <Link
+        href="/student/explore"
         className="w-full h-12 border-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/5 font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm bg-white"
       >
         <span>Back to Deal Feed</span>
-      </button>
+      </Link>
     </motion.div>
   );
 }

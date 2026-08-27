@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Store, Eye, EyeOff, Lock, Mail, HelpCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
@@ -206,12 +207,12 @@ export default function VendorSignIn() {
                         </p>
                         <p>
                             New vendor?{" "}
-                            <button
-                                onClick={() => router.push("/vendor/apply")}
+                            <Link
+                                href="/vendor/apply"
                                 className="font-semibold text-[#FF6B00] hover:underline"
                             >
                                 Apply here
-                            </button>
+                            </Link>
                         </p>
                     </div>
                 </div>

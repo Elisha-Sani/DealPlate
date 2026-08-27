@@ -1,10 +1,12 @@
 'use client';
 
+import Image from 'next/image';
 import { Store, ShoppingBag } from 'lucide-react';
 import type { Deal } from '@/types';
 import Price from '@/components/ui/Price';
 import Timer from '@/components/ui/Timer';
 import { secondsUntil } from '@/lib/utils';
+import Link from 'next/link';
 
 interface DealCardProps {
   deal: Deal;
@@ -20,19 +22,21 @@ export default function DealCard({ deal, layout = 'grid', onSelect, onQuickReser
 
   return (
     <article
-      onClick={() => onSelect(deal)}
-      className={`bg-white rounded-xl overflow-hidden border border-[#F3F4F6] shadow-sm hover:shadow-md transition-all duration-300 active:scale-[0.99] group cursor-pointer relative flex flex-col ${isMasonry ? 'mb-4' : 'h-full'}`}
+      className={`bg-white rounded-xl overflow-hidden border border-[#F3F4F6] shadow-sm hover:shadow-md transition-all duration-300 active:scale-[0.99] group relative flex flex-col ${isMasonry ? 'mb-4' : 'h-full'}`}
     >
+      <Link href={`/student/deals/${deal.id}`} className="absolute inset-0 z-10" aria-label={`View details for ${deal.title}`} />
+      
       {/* Aspect-Video Top Image */}
       <div className={`relative w-full ${isSmall ? 'aspect-square' : 'aspect-video'} bg-[#F3F4F6] overflow-hidden shrink-0`}>
-        <img
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        <Image
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
           src={deal.image}
           alt={deal.title}
-          loading="lazy"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         {/* Discount Badge */}
-        <div className={`absolute top-2 left-2 bg-[#E11D48] text-white font-bold rounded-full shadow-md ${isSmall ? 'text-[10px] px-2 py-0.5' : 'text-xs px-3 py-1'}`}>
+        <div className={`absolute top-2 left-2 bg-[#E11D48] text-white font-bold rounded-full shadow-md ${isSmall ? 'text-[10px] px-2 py-0.5' : 'text-xs px-3 py-1'} z-10`}>
           {deal.discountPercentage}% OFF
         </div>
       </div>
@@ -72,10 +76,11 @@ export default function DealCard({ deal, layout = 'grid', onSelect, onQuickReser
 
           <button
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onQuickReserve(deal, e);
             }}
-            className={`${isSmall ? 'h-8 w-8' : 'h-12 w-12'} rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md hover:bg-[#e66000] active:scale-90 transition-all duration-200 shrink-0`}
+            className={`relative z-20 ${isSmall ? 'h-8 w-8' : 'h-12 w-12'} rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md hover:bg-[#e66000] active:scale-90 transition-all duration-200 shrink-0`}
             aria-label="Add deal to cart"
           >
             <ShoppingBag className={isSmall ? 'w-4 h-4' : 'w-5 h-5'} />

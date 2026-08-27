@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
+import Image from 'next/image';
 import { Building2, Camera, Loader2, LogOut, Lock, Save, Store } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import VendorTopBar from '@/components/layout/VendorTopBar';
@@ -178,10 +179,12 @@ export default function VendorSettings() {
         <section className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col items-center text-center">
           <div className="relative mb-3 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             {form.logo_url ? (
-              <img
+              <Image
                 src={form.logo_url}
                 alt="Business logo"
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md transition-opacity group-hover:opacity-80"
+                width={96}
+                height={96}
+                className="rounded-full object-cover border-4 border-white shadow-md transition-opacity group-hover:opacity-80 shrink-0"
               />
             ) : (
               <div className="w-24 h-24 rounded-full bg-[#1E293B]/5 border-4 border-white shadow-md flex items-center justify-center text-[#1E293B]/30 group-hover:opacity-80 transition-opacity">

@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { motion } from 'motion/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { Sparkles, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 
@@ -176,12 +177,12 @@ function StudentSignInForm() {
 
       <div className="mt-8 text-center">
         <p className="text-sm text-[#5a4136] mb-3">New to DealPlate?</p>
-        <button
-          onClick={() => router.push('/student/sign-up')}
-          className="border border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/5 px-8 h-12 rounded-lg font-bold active:scale-95 transition-all shadow-sm bg-white"
+        <Link
+          href="/student/sign-up"
+          className="inline-flex items-center justify-center border border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/5 px-8 h-12 rounded-lg font-bold active:scale-95 transition-all shadow-sm bg-white"
         >
           Create Student Account
-        </button>
+        </Link>
       </div>
     </motion.div>
   );

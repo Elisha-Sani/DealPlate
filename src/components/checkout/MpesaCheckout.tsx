@@ -8,7 +8,7 @@ interface MpesaCheckoutProps {
   dealId: string;
   amount: number;
   phoneNumber: string;
-  onSuccess: () => void;
+  onSuccess: (orderId: string) => void;
   onCancel: () => void;
 }
 
@@ -56,7 +56,7 @@ export default function MpesaCheckout({ dealId, amount, phoneNumber, onSuccess, 
 
           if (data.status === 'completed') {
             stopTimers();
-            onSuccess();
+            onSuccess(data.order_id);
           } else if (data.status === 'failed') {
             stopTimers();
             setPhase('failed');

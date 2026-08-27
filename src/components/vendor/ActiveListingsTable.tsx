@@ -1,7 +1,8 @@
 'use client';
 
 import { PackageOpen, Settings } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import type { Deal } from '@/types';
 import { motion } from 'motion/react';
 
@@ -10,19 +11,17 @@ interface ActiveListingsTableProps {
 }
 
 export default function ActiveListingsTable({ deals }: ActiveListingsTableProps) {
-  const router = useRouter();
 
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-sm flex flex-col h-full min-h-[400px]">
       <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
         <h3 className="text-lg font-bold text-[#1E293B]">Inventory Listings</h3>
-        <button
-          type="button"
-          onClick={() => router.push('/vendor/inventory')}
-          className="h-9 px-3 rounded-lg bg-[#FF6B00] text-white text-xs font-bold hover:bg-[#e66000]"
+        <Link
+          href="/vendor/inventory"
+          className="h-9 px-3 rounded-lg bg-[#FF6B00] text-white text-xs font-bold hover:bg-[#e66000] flex items-center justify-center"
         >
           Manage Inventory
-        </button>
+        </Link>
       </div>
       <div className="flex-1 flex flex-col overflow-x-auto">
         {deals.length > 0 ? (
@@ -46,8 +45,8 @@ export default function ActiveListingsTable({ deals }: ActiveListingsTableProps)
                   className="hover:bg-gray-50/50 transition-colors"
                 >
                   <td className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E2E8F0] bg-gray-100 shrink-0">
-                      <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                    <div className="w-10 h-10 rounded-lg overflow-hidden border border-[#E2E8F0] bg-gray-100 shrink-0 relative">
+                      <Image src={item.image} alt={item.title} fill sizes="40px" className="object-cover" />
                     </div>
                     <span className="font-medium text-[#1E293B] line-clamp-1">{item.title}</span>
                   </td>
@@ -69,13 +68,12 @@ export default function ActiveListingsTable({ deals }: ActiveListingsTableProps)
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <button
-                      type="button"
-                      onClick={() => router.push('/vendor/inventory')}
-                      className="h-8 px-3 rounded-lg border border-[#E2E8F0] text-xs font-bold text-[#1E293B] hover:bg-white flex items-center gap-1"
+                    <Link
+                      href="/vendor/inventory"
+                      className="h-8 px-3 rounded-lg border border-[#E2E8F0] text-xs font-bold text-[#1E293B] hover:bg-white inline-flex items-center gap-1"
                     >
                       <Settings className="w-3.5 h-3.5" /> Manage
-                    </button>
+                    </Link>
                   </td>
                 </motion.tr>
               ))}

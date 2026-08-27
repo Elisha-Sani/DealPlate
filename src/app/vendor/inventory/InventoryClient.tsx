@@ -22,6 +22,7 @@ import { supabase } from "@/lib/supabase/client";
 import Price from "@/components/ui/Price";
 import { cn } from "@/lib/utils";
 import { generateDealDescription } from "@/app/actions/generateDescription";
+import Image from "next/image";
 
 import { useRouter } from "next/navigation";
 
@@ -777,8 +778,7 @@ export default function InventoryClient({
                                     )}
                                     {form.image && (
                                         <div className="relative group rounded-lg overflow-hidden border border-[#E2E8F0] w-16 h-16 shrink-0">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={form.image} alt="Preview" className="w-full h-full object-cover" />
+                                            <Image src={form.image} alt="Preview" fill sizes="64px" className="object-cover" />
                                             <button
                                                 type="button"
                                                 onClick={() => updateForm("image", "")}
@@ -953,11 +953,15 @@ export default function InventoryClient({
                                         key={item.id}
                                         className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-[#F8FAFC] transition-colors"
                                     >
-                                        <img
-                                            src={item.image || fallbackImage}
-                                            alt={item.title}
-                                            className="w-full md:w-24 h-32 md:h-20 object-cover rounded-lg border border-[#E2E8F0] bg-gray-100 shrink-0"
-                                        />
+                                        <div className="relative w-full md:w-24 h-32 md:h-20 rounded-lg border border-[#E2E8F0] bg-gray-100 shrink-0 overflow-hidden">
+                                            <Image
+                                                src={item.image || fallbackImage}
+                                                alt={item.title}
+                                                fill
+                                                sizes="(max-width: 768px) 100vw, 96px"
+                                                className="object-cover"
+                                            />
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex flex-wrap items-center gap-2 mb-1">
                                                 <h3 className="font-bold text-[#1E293B] truncate">

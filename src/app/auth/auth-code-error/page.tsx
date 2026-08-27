@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { motion } from 'motion/react';
 import { ShieldAlert } from 'lucide-react';
 
@@ -25,18 +26,18 @@ export default function AuthCodeErrorPage() {
       </p>
 
       <div className="flex flex-col gap-3">
-        <button
-          onClick={() => router.push('/student/sign-in')}
-          className="w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md"
+        <Link
+          href="/student/sign-in"
+          className="flex items-center justify-center w-full h-12 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000] active:scale-95 transition-all shadow-md"
         >
           Back to Student Sign In
-        </button>
-        <button
-          onClick={() => router.push('/vendor/sign-in')}
-          className="w-full h-12 border border-[#FF6B00] text-[#FF6B00] rounded-lg font-bold hover:bg-[#FF6B00]/5 active:scale-95 transition-all"
+        </Link>
+        <Link
+          href="/vendor/sign-in"
+          className="flex items-center justify-center w-full h-12 border border-[#FF6B00] text-[#FF6B00] rounded-lg font-bold hover:bg-[#FF6B00]/5 active:scale-95 transition-all"
         >
           Back to Vendor Sign In
-        </button>
+        </Link>
       </div>
     </motion.div>
   );

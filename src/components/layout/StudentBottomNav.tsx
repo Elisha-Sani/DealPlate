@@ -3,6 +3,7 @@
 import { Compass, Heart, ReceiptText, User } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 export default function StudentBottomNav() {
   const router = useRouter();
@@ -21,9 +22,9 @@ export default function StudentBottomNav() {
         const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
 
         return (
-          <button
+          <Link
             key={item.path}
-            onClick={() => router.push(item.path)}
+            href={item.path}
             className={cn(
               'flex flex-col items-center justify-center gap-1 w-16 transition-transform',
               isActive ? 'text-[#FF6B00] scale-105' : 'text-gray-400 hover:text-[#FF6B00]'
@@ -33,7 +34,7 @@ export default function StudentBottomNav() {
               <item.icon className="w-5 h-5" />
             </div>
             <span className="text-[10px] font-bold tracking-wider uppercase">{item.label}</span>
-          </button>
+          </Link>
         );
       })}
     </nav>

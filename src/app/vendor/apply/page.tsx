@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, HelpCircle, Loader2 } from 'lucide-react';
 import StepIndicator from '@/components/ui/StepIndicator';
@@ -102,7 +103,7 @@ export default function VendorApply() {
               </div>
             </div>
             <div className="mt-10 flex justify-between items-center border-t border-[#E2E8F0] pt-6">
-              <button type="button" onClick={() => router.push('/vendor/sign-in')} className="text-gray-500 font-medium hover:text-[#1E293B]">Cancel</button>
+              <Link href="/vendor/sign-in" className="inline-flex items-center justify-center text-gray-500 font-medium hover:text-[#1E293B]">Cancel</Link>
               <button type="submit" className="px-6 py-2.5 bg-[#FF6B00] text-white rounded-lg font-bold hover:bg-[#e66000]">Next: Security &amp; Terms</button>
             </div>
           </form>
@@ -156,9 +157,9 @@ export default function VendorApply() {
             <p className="text-sm text-gray-500 max-w-sm mx-auto mb-8 leading-relaxed">
               Your login account has been created and is pending superadmin approval. You can sign in after approval.
             </p>
-            <button onClick={() => router.push('/vendor/sign-in')} className="px-6 py-2.5 border border-[#E2E8F0] text-[#1E293B] rounded-lg font-medium hover:bg-gray-50">
+            <Link href="/vendor/sign-in" className="inline-flex items-center justify-center px-6 py-2.5 border border-[#E2E8F0] text-[#1E293B] rounded-lg font-medium hover:bg-gray-50">
               Return to Sign In
-            </button>
+            </Link>
           </div>
         )}
       </div>

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowLeft, Clock, ShieldCheck, Smartphone, Store, Lock } from 'lucide-react';
 import { useCart } from '@/providers/CartProvider';
 import { useUser } from '@/providers/UserProvider';
@@ -28,14 +30,14 @@ export default function StudentCheckout() {
 
   const total = cartDeal.dealPrice + SERVICE_FEE;
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (orderId: string) => {
     // The order itself is created server-side by the M-Pesa callback once
     // Safaricom confirms payment — by the time we get here it already
     // exists, so this just reflects that in the UI and moves on.
     setIsPaying(false);
     updateStats(cartDeal.originalPrice - cartDeal.dealPrice);
     clearCart();
-    router.push('/student/orders?confirmed=1');
+    router.push(`/student/orders/${orderId}?confirmed=1`);
   };
 
   return (
@@ -46,13 +48,13 @@ export default function StudentCheckout() {
       className="max-w-5xl w-full mx-auto flex flex-col gap-6 px-4 md:px-0 pb-10"
     >
       <div>
-        <button
-          onClick={() => router.push('/student/explore')}
+        <Link
+          href="/student/explore"
           className="inline-flex items-center gap-1 text-sm font-semibold text-[#FF6B00] hover:underline mb-3"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Continue browsing</span>
-        </button>
+        </Link>
         <h2 className="font-display font-extrabold text-4xl tracking-tight text-[#111827] mb-2 leading-tight">Checkout</h2>
         <p className="text-[#5a4136] text-base">Review your flash deal and complete secure mobile payment.</p>
       </div>
@@ -62,7 +64,7 @@ export default function StudentCheckout() {
         <div className="md:col-span-7 space-y-6">
           <div className="bg-white rounded-2xl border border-[#F3F4F6] p-6 shadow-sm flex gap-5 items-center">
             <div className="w-28 h-28 rounded-xl overflow-hidden shrink-0 relative bg-gray-100 border">
-              <img src={cartDeal.image} alt={cartDeal.title} className="w-full h-full object-cover" />
+              <Image src={cartDeal.image} alt={cartDeal.title} fill sizes="112px" className="object-cover" />
               <div className="absolute top-0 left-0 bg-[#E11D48] text-white text-xs font-black px-2.5 py-1 rounded-br-lg">
                 -{cartDeal.discountPercentage}%
               </div>
