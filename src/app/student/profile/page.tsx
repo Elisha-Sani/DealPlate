@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera, Loader2, Save } from 'lucide-react';
+import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera, Loader2, Save, MessageSquare, Send } from 'lucide-react';
 import { useUser } from '@/providers/UserProvider';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/lib/supabase/client';
@@ -23,6 +23,11 @@ export default function StudentProfile() {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const [isContactOpen, setIsContactOpen] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+  const [isSendingSupport, setIsSendingSupport] = useState(false);
+  const [supportStatus, setSupportStatus] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -112,6 +117,24 @@ export default function StudentProfile() {
     }
   };
 
+  const handleSupportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactMessage.trim()) return;
+    setIsSendingSupport(true);
+    setSupportStatus(null);
+    
+    // Simulate sending support request
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    setIsSendingSupport(false);
+    setSupportStatus({ text: 'Your message has been sent to our support team.', type: 'success' });
+    setContactMessage('');
+    setTimeout(() => {
+        setIsContactOpen(false);
+        setSupportStatus(null);
+    }, 3000);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.98 }}
@@ -155,7 +178,7 @@ export default function StudentProfile() {
           </div>
           <div>
             <span className="block text-xs font-black text-[#5a4136] uppercase tracking-wider mb-1">Total Savings</span>
-            <Price amount={pastOrders.filter(o => o.status === 'Completed').reduce((sum, o) => sum + (o.deal.originalPrice - o.deal.dealPrice), 0)} size="lg" className="text-[#FF6B00]" />
+            <Price amount={user.totalSaved || 0} size="lg" className="text-[#FF6B00]" />
           </div>
         </div>
         <div className="bg-white border border-[#F3F4F6] rounded-xl p-5 shadow-sm flex flex-col justify-between items-start hover:shadow transition-shadow">
@@ -164,7 +187,7 @@ export default function StudentProfile() {
           </div>
           <div>
             <span className="block text-xs font-black text-[#5a4136] uppercase tracking-wider mb-1">Meals Enjoyed</span>
-            <span className="text-2xl font-extrabold tracking-tight text-[#111827]">{pastOrders.filter(o => o.status === 'Completed').length} meals</span>
+            <span className="text-2xl font-extrabold tracking-tight text-[#111827]">{user.mealsEnjoyed || 0} meals</span>
           </div>
         </div>
       </section>
@@ -204,7 +227,16 @@ export default function StudentProfile() {
               value={user.university || ''}
               className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-gray-50 text-sm text-gray-400 cursor-not-allowed"
             />
-            <p className="text-xs text-gray-400 mt-1.5">To change your university, proof of enrollment is required. Contact support.</p>
+            <p className="text-xs text-gray-400 mt-1.5">
+              To change your university, proof of enrollment is required.{' '}
+              <button 
+                type="button" 
+                onClick={() => setIsContactOpen(!isContactOpen)}
+                className="text-[#FF6B00] font-semibold hover:underline"
+              >
+                Contact support.
+              </button>
+            </p>
           </div>
 
           <button
@@ -217,6 +249,53 @@ export default function StudentProfile() {
           </button>
         </form>
       </section>
+
+      {isContactOpen && (
+        <motion.section 
+          initial={{ opacity: 0, y: -10 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-[#FFF8F6] border border-[#FF6B00]/20 rounded-xl p-5 shadow-sm space-y-4"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquare className="w-5 h-5 text-[#FF6B00]" />
+            <h3 className="font-display font-bold text-[#111827]">Contact Support</h3>
+          </div>
+          
+          {supportStatus ? (
+            <div className={`p-3 rounded-lg text-sm font-semibold border ${supportStatus.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+              {supportStatus.text}
+            </div>
+          ) : (
+            <form onSubmit={handleSupportSubmit} className="space-y-3">
+              <textarea
+                required
+                value={contactMessage}
+                onChange={(e) => setContactMessage(e.target.value)}
+                placeholder="How can we help you?"
+                rows={4}
+                className="w-full p-3 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm resize-none"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsContactOpen(false)}
+                  className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSendingSupport}
+                  className="px-4 py-2 bg-[#FF6B00] text-white rounded-lg text-sm font-bold hover:bg-[#e66000] flex items-center gap-2 transition-colors disabled:opacity-70"
+                >
+                  {isSendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  Send Message
+                </button>
+              </div>
+            </form>
+          )}
+        </motion.section>
+      )}
 
       <section className="space-y-4">
         <h3 className="font-display font-extrabold text-lg text-[#111827] ml-1">Past Transactions</h3>

@@ -630,6 +630,189 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 
+
+
+
+
+
+-- ============================================================
+-- ADDED FROM MIGRATIONS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.admin_actions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    admin_id uuid NOT NULL REFERENCES auth.users(id),
+    admin_email text NOT NULL,
+    action_type text NOT NULL,
+    target_type text NOT NULL CHECK (target_type IN ('student', 'vendor', 'deal')),
+    target_id uuid NOT NULL,
+    reason text,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.admin_actions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Superadmin can select and insert audit logs"
+ON public.admin_actions
+FOR ALL
+USING ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin')
+WITH CHECK ((auth.jwt() -> 'app_metadata' ->> 'role') = 'superadmin');
+
+REVOKE UPDATE, DELETE ON public.admin_actions FROM authenticated, anon, public;
+
+CREATE OR REPLACE FUNCTION public.prevent_admin_actions_modification()
+RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'Modification of admin_actions is strictly prohibited. This is an append-only audit log.';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER enforce_append_only_admin_actions
+BEFORE UPDATE OR DELETE ON public.admin_actions
+FOR EACH ROW EXECUTE FUNCTION public.prevent_admin_actions_modification();
+
+
+CREATE TABLE IF NOT EXISTS public.saved_deals (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    deal_id uuid NOT NULL REFERENCES public.deals(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT saved_deals_unique UNIQUE (user_id, deal_id)
+);
+
+CREATE INDEX IF NOT EXISTS saved_deals_user_id_idx ON public.saved_deals(user_id);
+
+ALTER TABLE public.saved_deals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own saved deals"
+ON public.saved_deals
+FOR SELECT
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can save deals for themselves"
+ON public.saved_deals
+FOR INSERT
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove their own saved deals"
+ON public.saved_deals
+FOR DELETE
+USING (auth.uid() = user_id);
+
+
+CREATE TABLE IF NOT EXISTS public.payments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    deal_id uuid NOT NULL REFERENCES public.deals(id),
+    checkout_request_id text NOT NULL UNIQUE,
+    merchant_request_id text NOT NULL,
+    amount numeric(10, 2) NOT NULL,
+    phone text NOT NULL,
+    status text NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'completed', 'failed')),
+    mpesa_receipt text,
+    result_code integer,
+    result_description text,
+    order_id uuid REFERENCES public.orders(id),
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS payments_user_id_idx ON public.payments(user_id);
+CREATE INDEX IF NOT EXISTS payments_checkout_request_id_idx ON public.payments(checkout_request_id);
+
+CREATE TRIGGER payments_set_updated_at
+BEFORE UPDATE ON public.payments
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own payments"
+ON public.payments
+FOR SELECT
+USING (auth.uid() = user_id);
+
+
+CREATE OR REPLACE FUNCTION public.create_order_after_payment(
+    p_user_id uuid,
+    p_deal_id uuid,
+    p_order_date text,
+    p_order_time text,
+    p_total_paid numeric
+)
+RETURNS public.orders
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_deal public.deals%ROWTYPE;
+    v_order public.orders%ROWTYPE;
+    v_pickup_code text;
+BEGIN
+    SELECT * INTO v_deal
+    FROM public.deals
+    WHERE id = p_deal_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Deal not found';
+    END IF;
+
+    IF v_deal.stock_count <= 0 THEN
+        RAISE EXCEPTION 'SOLD_OUT';
+    END IF;
+
+    UPDATE public.deals
+       SET stock_count = stock_count - 1
+     WHERE id = p_deal_id;
+
+    v_pickup_code := lpad(floor(random() * 1000000)::text, 6, '0');
+
+    INSERT INTO public.orders (
+        user_id, deal_id, order_date, order_time, status, total_paid, pickup_code
+    ) VALUES (
+        p_user_id, p_deal_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code
+    )
+    RETURNING * INTO v_order;
+
+    RETURN v_order;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.create_order_after_payment(uuid, uuid, text, text, numeric) FROM PUBLIC;
+
+
+CREATE OR REPLACE FUNCTION public.unpublish_expired_deals()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    UPDATE public.deals
+       SET is_published = false
+     WHERE is_published = true
+       AND expires_at <= now();
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.unpublish_expired_deals() TO authenticated, anon;
+
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+    -- Inject role: 'student' into app_metadata automatically
+    NEW.raw_app_meta_data = coalesce(NEW.raw_app_meta_data, '{}'::jsonb) || '{"role": "student"}'::jsonb;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  BEFORE INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
 CREATE OR REPLACE FUNCTION public.review_student_kyc_application(
     p_application_id uuid,
     p_status text,
@@ -796,3 +979,38 @@ $$;
 GRANT EXECUTE ON FUNCTION public.review_student_kyc_application(uuid, text, text, uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.review_vendor_application(uuid, text, text, uuid, text) TO authenticated;
 
+-- Create a function to update student profile stats when an order is completed
+CREATE OR REPLACE FUNCTION update_student_stats_on_order_complete()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_deal public.deals%ROWTYPE;
+    v_saved numeric(10,2);
+BEGIN
+    -- Only act if the status changed to 'Completed'
+    IF NEW.status = 'Completed' AND OLD.status != 'Completed' THEN
+        -- Calculate how much they saved
+        -- deal_original_price - deal_price
+        v_saved := COALESCE(NEW.deal_original_price, 0) - COALESCE(NEW.deal_price, 0);
+        IF v_saved < 0 THEN
+            v_saved := 0;
+        END IF;
+
+        -- Update the student profile
+        UPDATE public.student_profiles
+        SET 
+            meals_enjoyed = meals_enjoyed + 1,
+            total_saved = total_saved + v_saved
+        WHERE id = NEW.user_id;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create the trigger on the orders table
+DROP TRIGGER IF EXISTS trigger_update_student_stats ON public.orders;
+
+CREATE TRIGGER trigger_update_student_stats
+AFTER UPDATE OF status ON public.orders
+FOR EACH ROW
+EXECUTE FUNCTION update_student_stats_on_order_complete();

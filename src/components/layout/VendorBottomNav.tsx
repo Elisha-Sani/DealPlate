@@ -27,8 +27,8 @@ export default function VendorBottomNav() {
             key={item.path}
             href={item.path}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 w-16 transition-transform',
-              isActive ? 'text-[#FF6B00] scale-105' : 'text-gray-400 hover:text-[#FF6B00]'
+              'flex flex-col items-center justify-center gap-1 w-16 transition-all duration-150 active:scale-90',
+              isActive ? 'text-[#FF6B00] scale-105 active:scale-100' : 'text-gray-400 hover:text-[#FF6B00]'
             )}
           >
             <div className={cn('p-1.5 rounded-full', isActive && 'bg-[#FF6B00]/10')}>
