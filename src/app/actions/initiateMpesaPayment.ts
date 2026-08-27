@@ -17,6 +17,20 @@ export async function initiateMpesaPayment(dealId: string, phone: string) {
       return { success: false, error: 'You must be signed in to pay.' };
     }
 
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('student_profiles')
+      .select('is_verified')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return { success: false, error: 'Could not fetch your profile.' };
+    }
+
+    if (!profile.is_verified) {
+      return { success: false, error: 'You must complete KYC verification before purchasing meals.' };
+    }
+
     // Recompute the price server-side from the deal row — never trust a
     // client-supplied amount for anything that triggers a real payment.
     const { data: deal, error: dealError } = await supabaseAdmin

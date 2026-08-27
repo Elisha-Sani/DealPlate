@@ -82,7 +82,12 @@ CREATE TABLE IF NOT EXISTS public.deals (
 CREATE TABLE IF NOT EXISTS public.orders (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id uuid NOT NULL REFERENCES public.student_profiles(id) ON DELETE CASCADE,
-    deal_id uuid NOT NULL REFERENCES public.deals(id) ON DELETE CASCADE,
+    deal_id uuid REFERENCES public.deals(id) ON DELETE SET NULL,
+    deal_title text NOT NULL DEFAULT 'Unavailable Deal',
+    deal_vendor text NOT NULL DEFAULT 'Unknown',
+    deal_image text NOT NULL DEFAULT '',
+    deal_original_price numeric(10, 2) NOT NULL DEFAULT 0,
+    deal_price numeric(10, 2) NOT NULL DEFAULT 0,
     order_date text NOT NULL,
     order_time text NOT NULL,
     status text NOT NULL DEFAULT 'Pending',
@@ -521,9 +526,9 @@ BEGIN
     v_pickup_code := lpad(floor(random() * 1000000)::text, 6, '0');
 
     INSERT INTO public.orders (
-        user_id, deal_id, order_date, order_time, status, total_paid, pickup_code
+        user_id, deal_id, order_date, order_time, status, total_paid, pickup_code, deal_title, deal_vendor, deal_image, deal_original_price, deal_price
     ) VALUES (
-        p_user_id, p_deal_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code
+        p_user_id, p_deal_id, p_order_date, p_order_time, 'Active', p_total_paid, v_pickup_code, v_deal.title, v_deal.vendor, v_deal.image, v_deal.original_price, v_deal.deal_price
     )
     RETURNING * INTO v_order;
 

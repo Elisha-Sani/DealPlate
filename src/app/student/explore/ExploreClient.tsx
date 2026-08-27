@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { Search, MapPin, X, SlidersHorizontal } from 'lucide-react';
 import { useDeals } from '@/hooks/useDeals';
 import { useOrders } from '@/hooks/useOrders';
 import { useCart } from '@/providers/CartProvider';
+import { useUser } from '@/providers/UserProvider';
 import Price from '@/components/ui/Price';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import MarketplaceFeed from '@/components/deal/MarketplaceFeed';
@@ -49,6 +50,9 @@ export default function ExploreClient({
     setSortBy
   } = useDeals(initialDeals);
   const [layout, setLayout] = useState<'grid' | 'masonry'>('grid');
+  const { user } = useUser();
+  const [isPending, startTransition] = useTransition();
+  const [pendingDealId, setPendingDealId] = useState<string | null>(null);
 
   const handleSelectDeal = (deal: Deal) => {
     router.push(`/student/deals/${deal.id}`);
@@ -56,8 +60,16 @@ export default function ExploreClient({
 
   const handleQuickReserve = (deal: Deal, e: React.MouseEvent) => {
     e.stopPropagation();
-    setCartDeal(deal);
-    router.push('/student/checkout');
+    if (user && !user.isVerified) {
+      alert('You must complete KYC verification before reserving a meal.');
+      router.push('/student/settings');
+      return;
+    }
+    setPendingDealId(deal.id);
+    startTransition(() => {
+      setCartDeal(deal);
+      router.push('/student/checkout');
+    });
   };
 
   return (
@@ -162,6 +174,7 @@ export default function ExploreClient({
         <MarketplaceFeed
           deals={filteredDeals}
           layout={layout}
+          pendingDealId={pendingDealId}
           onSelectDeal={handleSelectDeal}
           onQuickReserve={handleQuickReserve}
         />

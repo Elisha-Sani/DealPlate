@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 interface MarketplaceFeedProps {
   deals: Deal[];
   layout?: 'grid' | 'masonry';
+  pendingDealId?: string | null;
   onSelectDeal: (deal: Deal) => void;
   onQuickReserve: (deal: Deal, e: React.MouseEvent) => void;
 }
@@ -15,6 +16,7 @@ interface MarketplaceFeedProps {
 export default function MarketplaceFeed({
   deals,
   layout = 'grid',
+  pendingDealId = null,
   onSelectDeal,
   onQuickReserve,
 }: MarketplaceFeedProps) {
@@ -61,6 +63,7 @@ export default function MarketplaceFeed({
             <DealCard
               deal={deal}
               layout="masonry"
+              isPending={pendingDealId === deal.id}
               onSelect={onSelectDeal}
               onQuickReserve={onQuickReserve}
             />
@@ -92,6 +95,7 @@ export default function MarketplaceFeed({
                 <DealCard
                   deal={deal}
                   layout="compact"
+                  isPending={pendingDealId === deal.id}
                   onSelect={onSelectDeal}
                   onQuickReserve={onQuickReserve}
                 />
@@ -119,6 +123,7 @@ export default function MarketplaceFeed({
                 <DealCard
                   deal={deal}
                   layout="grid"
+                  isPending={pendingDealId === deal.id}
                   onSelect={onSelectDeal}
                   onQuickReserve={onQuickReserve}
                 />
@@ -133,6 +138,7 @@ export default function MarketplaceFeed({
                 <DealCard
                   deal={deal}
                   layout="compact"
+                  isPending={pendingDealId === deal.id}
                   onSelect={onSelectDeal}
                   onQuickReserve={onQuickReserve}
                 />

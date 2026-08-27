@@ -1,11 +1,11 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { useState, useTransition } from 'react';
 import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Heart, Share2, Store, Clock, MapPin, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, Store, Clock, MapPin, ShoppingBag, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { useCart } from '@/providers/CartProvider';
 import { useUser } from '@/providers/UserProvider';
@@ -28,6 +28,7 @@ export default function DealDetailsClient({
   const { user } = useUser();
   const { isSaved, toggleSaved } = useSavedDeals(undefined, initialSavedDealIds);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   // Since deal id is used in handleToggleSaved, we ensure we have deal before calling
   const handleToggleSaved = () => {
@@ -190,11 +191,26 @@ export default function DealDetailsClient({
           {/* CTA - Pushed to the bottom */}
           <div className="mt-8 pt-6 border-t border-gray-100">
             <button
-              onClick={() => { setCartDeal(deal); router.push('/student/checkout'); }}
-              className="w-full h-14 bg-[#FF6B00] hover:bg-[#e66000] text-white font-display font-extrabold text-lg tracking-tight rounded-xl flex items-center justify-center gap-2 transition-transform active:scale-95 duration-100 shadow-[0_8px_20px_-6px_rgba(255,107,0,0.5)] hover:shadow-[0_12px_24px_-6px_rgba(255,107,0,0.6)]"
+              onClick={() => {
+                if (user && !user.isVerified) {
+                  alert('You must complete KYC verification before reserving a meal.');
+                  router.push('/student/settings');
+                  return;
+                }
+                startTransition(() => {
+                  setCartDeal(deal);
+                  router.push('/student/checkout');
+                });
+              }}
+              disabled={isPending}
+              className={`w-full h-14 bg-[#FF6B00] hover:bg-[#e66000] text-white font-display font-extrabold text-lg tracking-tight rounded-xl flex items-center justify-center gap-2 transition-transform shadow-[0_8px_20px_-6px_rgba(255,107,0,0.5)] hover:shadow-[0_12px_24px_-6px_rgba(255,107,0,0.6)] ${isPending ? 'opacity-70 cursor-not-allowed' : 'active:scale-95 duration-100'}`}
             >
-              <ShoppingBag className="w-6 h-6" />
-              <span>Place Order via M-Pesa</span>
+              {isPending ? (
+                 <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                 <ShoppingBag className="w-6 h-6" />
+              )}
+              <span>{isPending ? 'Loading...' : 'Place Order via M-Pesa'}</span>
             </button>
           </div>
         </div>

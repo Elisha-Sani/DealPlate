@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Store, ShoppingBag } from 'lucide-react';
+import { Store, ShoppingBag, Loader2 } from 'lucide-react';
 import type { Deal } from '@/types';
 import Price from '@/components/ui/Price';
 import Timer from '@/components/ui/Timer';
@@ -11,11 +11,12 @@ import Link from 'next/link';
 interface DealCardProps {
   deal: Deal;
   layout?: 'grid' | 'masonry' | 'compact';
+  isPending?: boolean;
   onSelect: (deal: Deal) => void;
   onQuickReserve: (deal: Deal, e: React.MouseEvent) => void;
 }
 
-export default function DealCard({ deal, layout = 'grid', onSelect, onQuickReserve }: DealCardProps) {
+export default function DealCard({ deal, layout = 'grid', isPending = false, onSelect, onQuickReserve }: DealCardProps) {
   const isMasonry = layout === 'masonry';
   const isCompact = layout === 'compact';
   const isSmall = isMasonry || isCompact;
@@ -80,10 +81,15 @@ export default function DealCard({ deal, layout = 'grid', onSelect, onQuickReser
               e.stopPropagation();
               onQuickReserve(deal, e);
             }}
-            className={`relative z-20 ${isSmall ? 'h-8 w-8' : 'h-12 w-12'} rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md hover:bg-[#e66000] active:scale-90 transition-all duration-200 shrink-0`}
+            disabled={isPending}
+            className={`relative z-20 ${isSmall ? 'h-8 w-8' : 'h-12 w-12'} rounded-full bg-[#FF6B00] text-white flex items-center justify-center shadow-md hover:bg-[#e66000] active:scale-90 transition-all duration-200 shrink-0 ${isPending ? 'opacity-70 cursor-not-allowed' : ''}`}
             aria-label="Add deal to cart"
           >
-            <ShoppingBag className={isSmall ? 'w-4 h-4' : 'w-5 h-5'} />
+            {isPending ? (
+               <Loader2 className={`animate-spin ${isSmall ? 'w-4 h-4' : 'w-5 h-5'}`} />
+            ) : (
+               <ShoppingBag className={isSmall ? 'w-4 h-4' : 'w-5 h-5'} />
+            )}
           </button>
         </div>
       </div>

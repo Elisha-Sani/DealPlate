@@ -15,14 +15,19 @@ import { SERVICE_FEE } from '@/lib/constants';
 export default function StudentCheckout() {
   const router = useRouter();
   const { cartDeal, mpesaPhone, setMpesaPhone, clearCart } = useCart();
-  const { updateStats } = useUser();
+  const { user, updateStats } = useUser();
   const [isPaying, setIsPaying] = useState(false);
+
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (!cartDeal) {
       router.push('/student/explore');
+    } else if (user && !user.isVerified) {
+      alert('You must complete KYC verification before purchasing meals.');
+      router.push('/student/settings');
     }
-  }, [cartDeal, router]);
+  }, [cartDeal, router, user]);
 
   if (!cartDeal) {
     return null;
@@ -31,10 +36,7 @@ export default function StudentCheckout() {
   const total = cartDeal.dealPrice + SERVICE_FEE;
 
   const handlePaymentSuccess = (orderId: string) => {
-    // The order itself is created server-side by the M-Pesa callback once
-    // Safaricom confirms payment — by the time we get here it already
-    // exists, so this just reflects that in the UI and moves on.
-    setIsPaying(false);
+    setIsRedirecting(true);
     updateStats(cartDeal.originalPrice - cartDeal.dealPrice);
     clearCart();
     router.push(`/student/orders/${orderId}?confirmed=1`);
@@ -146,7 +148,7 @@ export default function StudentCheckout() {
         </div>
       </div>
 
-      {isPaying && (
+      {isPaying && !isRedirecting && (
         <MpesaCheckout
           dealId={cartDeal.id}
           amount={total}
@@ -154,6 +156,19 @@ export default function StudentCheckout() {
           onSuccess={handlePaymentSuccess}
           onCancel={() => setIsPaying(false)}
         />
+      )}
+
+      {isRedirecting && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-8 shadow-2xl border border-gray-100 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-[#26B24B]/10 text-[#26B24B] flex items-center justify-center relative mb-4">
+              <Lock className="w-16 h-16 absolute text-[#26B24B]/20 animate-spin" />
+              <ShieldCheck className="w-7 h-7 text-[#26B24B]" />
+            </div>
+            <h3 className="font-display font-extrabold text-xl text-[#111827] mb-1">Payment Successful!</h3>
+            <p className="text-sm text-gray-500">Preparing your order receipt...</p>
+          </div>
+        </div>
       )}
     </motion.div>
   );
