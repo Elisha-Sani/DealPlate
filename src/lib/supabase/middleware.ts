@@ -46,15 +46,17 @@ export async function updateSession(request: NextRequest) {
   const isSuperadminRoute = path.startsWith('/superadmin')
   const isVendorRoute = path.startsWith('/vendor') && !path.startsWith('/vendor/sign-in') && !path.startsWith('/vendor/apply')
   const isStudentRoute = STUDENT_AUTH_REQUIRED_PREFIXES.some((prefix) => path.startsWith(prefix))
+  
+  // Auth routes that we want to redirect users away from if they are already logged in
+  const isAuthRoute = path.startsWith('/student/sign-in') || path.startsWith('/student/sign-up') || path.startsWith('/vendor/sign-in') || path.startsWith('/vendor/apply') || path.startsWith('/auth/reset-password')
 
-  // getUser() revalidates the session against the Supabase Auth server (a
   // real network round-trip — unlike getSession(), which just reads the
   // local cookie) so it's the only safe way to trust a role/account_status
   // claim in middleware. That round-trip is real latency (~100-500ms), so
   // only pay it on routes whose logic below actually depends on the result.
-  // Pages outside these three categories (landing page, sign-in/up forms,
-  // guest-browsable explore/deal pages) never read `user` at all.
-  if (!isSuperadminRoute && !isVendorRoute && !isStudentRoute) {
+  // Pages outside these categories (landing page, guest-browsable explore/deal pages) 
+  // never read `user` at all.
+  if (!isSuperadminRoute && !isVendorRoute && !isStudentRoute && !isAuthRoute) {
     return supabaseResponse
   }
 
@@ -98,17 +100,20 @@ export async function updateSession(request: NextRequest) {
   // Enforce role boundaries for logged-in users
   if (user) {
     if (accountStatus === 'revoked') {
-      // Clear their session entirely or redirect to a specific revoked page.
-      // For now, redirecting to login will force them to see they can't access things,
-      // and they'll be blocked from logging in successfully if we handle it at login.
-      // Alternatively, we just redirect them to a generic access-denied or sign-in page.
+      // Redirect revoked users to an error page instead of a sign-in page to avoid infinite loops
+      // since their session technically still exists but is invalid for our app.
       const url = request.nextUrl.clone()
-      url.pathname = role === 'vendor' ? '/vendor/sign-in' : role === 'superadmin' ? '/superadmin' : '/student/sign-in'
+      url.pathname = '/auth/auth-code-error'
 
-      // We must avoid infinite loops if they are already on the sign-in page
       if (path !== url.pathname) {
         return NextResponse.redirect(url)
       }
+    }
+
+    if (isAuthRoute && accountStatus !== 'revoked') {
+      const url = request.nextUrl.clone()
+      url.pathname = role === 'vendor' ? '/vendor/dashboard' : role === 'superadmin' ? '/superadmin' : '/student/explore'
+      return NextResponse.redirect(url)
     }
 
     if (isSuperadminRoute && role !== 'superadmin') {

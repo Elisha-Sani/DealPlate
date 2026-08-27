@@ -9,6 +9,7 @@ interface UserContextType {
   user: User | null;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   isAuthenticated: boolean;
+  isLoadingAuth: boolean;
   login: (userData?: Partial<User>) => void;
   logout: () => void;
   updateStats: (savedAmount: number) => void;
@@ -19,23 +20,52 @@ const UserContext = createContext<UserContextType | null>(null);
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   useEffect(() => {
     // Use getUser() (not getSession()) here — it revalidates against the
     // Supabase Auth server instead of trusting the locally stored session.
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
-        fetchStudentProfile(user.id, user.email || '');
+        if (user.app_metadata?.account_status === 'revoked') {
+          supabase.auth.signOut().then(() => {
+            setUser(null);
+            setIsAuthenticated(false);
+            setIsLoadingAuth(false);
+          });
+          return;
+        }
+
+        if (user.app_metadata?.role === 'student' || !user.app_metadata?.role) {
+          fetchStudentProfile(user.id, user.email || '');
+        } else {
+          setIsLoadingAuth(false);
+        }
+      } else {
+        setIsLoadingAuth(false);
       }
     });
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        fetchStudentProfile(session.user.id, session.user.email || '');
+        if (session.user.app_metadata?.account_status === 'revoked') {
+          supabase.auth.signOut();
+          setUser(null);
+          setIsAuthenticated(false);
+          setIsLoadingAuth(false);
+          return;
+        }
+
+        if (session.user.app_metadata?.role === 'student' || !session.user.app_metadata?.role) {
+          fetchStudentProfile(session.user.id, session.user.email || '');
+        } else {
+          setIsLoadingAuth(false);
+        }
       } else {
         setUser(null);
         setIsAuthenticated(false);
+        setIsLoadingAuth(false);
       }
     });
 
@@ -66,6 +96,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       });
       setIsAuthenticated(true);
     }
+    setIsLoadingAuth(false);
   };
 
   const login = useCallback((userData?: Partial<User>) => {
@@ -92,7 +123,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider
-      value={{ user, setUser, isAuthenticated, login, logout, updateStats }}
+      value={{ user, setUser, isAuthenticated, isLoadingAuth, login, logout, updateStats }}
     >
       {children}
     </UserContext.Provider>

@@ -32,7 +32,7 @@ function readFileAsDataUrl(file: File) {
 
 export default function StudentUploadId() {
     const router = useRouter();
-    const { user, setUser } = useUser();
+    const { user, setUser, isLoadingAuth } = useUser();
     const [details, setDetails] = useState<AcademicDetails | null>(null);
     const [studentIdFile, setStudentIdFile] = useState<File | null>(null);
     const [universityDocFile, setUniversityDocFile] = useState<File | null>(
@@ -51,8 +51,8 @@ export default function StudentUploadId() {
     }, []);
 
     useEffect(() => {
-        if (!user) router.push("/student/sign-in");
-    }, [router, user]);
+        if (!isLoadingAuth && !user) router.push("/student/sign-in");
+    }, [router, user, isLoadingAuth]);
 
   const handleSubmit = async () => {
         if (!user?.id) return;
