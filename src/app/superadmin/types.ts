@@ -29,3 +29,6 @@ export interface VendorApplication {
   status: string;
   created_at: string;
 }
+
+export type { SupportTicket, SupportUserRole, SupportTicketStatus, SupportTicketCategory } from '@/types/support';
+

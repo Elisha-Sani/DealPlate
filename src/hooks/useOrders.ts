@@ -41,30 +41,33 @@ export function useOrders(initialPastOrders?: Order[], initialActiveOrder?: Orde
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        const mapped: Order[] = data.map(o => ({
-          id: o.id,
-          deal: {
-            id: o.deal.id,
-            title: o.deal.title,
-            vendor: o.deal.vendor,
-            campus: o.deal.campus,
-            originalPrice: o.deal.original_price,
-            dealPrice: o.deal.deal_price,
-            image: o.deal.image,
-            discountPercentage: o.deal.discount_percentage,
-            timeStart: o.deal.time_start,
-            timeEnd: o.deal.time_end,
-            category: o.deal.category,
-            stockCount: o.deal.stock_count,
-            expiresAt: o.deal.expires_at
-          } as Deal,
-          date: o.order_date,
-          time: o.order_time,
-          status: o.status,
-          totalPaid: Number(o.total_paid),
-          pickupCode: o.pickup_code,
-          pickupDeadline: o.pickup_deadline
-        }));
+        const mapped: Order[] = data.map(o => {
+          const deal = o.deal as Record<string, any> | null;
+          return {
+            id: o.id,
+            deal: {
+              id: deal ? deal.id : (o.deal_id || 'deleted-deal'),
+              title: deal ? deal.title : (o.deal_title || 'Unavailable Deal'),
+              vendor: deal ? deal.vendor : (o.deal_vendor || 'Unknown Vendor'),
+              campus: deal ? deal.campus : 'Unknown Campus',
+              originalPrice: Number(deal ? deal.original_price : (o.deal_original_price ?? o.total_paid ?? 0)),
+              dealPrice: Number(deal ? deal.deal_price : (o.deal_price ?? o.total_paid ?? 0)),
+              image: deal?.image || o.deal_image || '/images/dealplatehero.webp',
+              discountPercentage: Number(deal?.discount_percentage ?? 0),
+              timeStart: deal?.time_start || '--:--',
+              timeEnd: deal?.time_end || '--:--',
+              category: deal?.category || 'lunch',
+              stockCount: Number(deal?.stock_count ?? 0),
+              expiresAt: deal?.expires_at || ''
+            } as Deal,
+            date: o.order_date,
+            time: o.order_time,
+            status: o.status,
+            totalPaid: Number(o.total_paid),
+            pickupCode: o.pickup_code,
+            pickupDeadline: o.pickup_deadline
+          };
+        });
         const active = mapped.find(o => o.status === 'Active') || null;
         setActiveOrder(active);
         setPastOrders(mapped.filter(o => o.id !== active?.id));

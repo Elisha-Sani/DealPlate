@@ -14,6 +14,7 @@ export interface AdminOverviewStats {
   pendingVendorApplications: number;
   activeOrders: number;
   completedOrders: number;
+  openSupportTickets: number;
 }
 
 async function count(
@@ -47,6 +48,7 @@ export async function adminGetOverview(): Promise<{ success: boolean; stats?: Ad
       pendingVendorApplications,
       activeOrders,
       completedOrders,
+      openSupportTickets,
     ] = await Promise.all([
       count('student_profiles', {}),
       count('student_profiles', { is_verified: true }),
@@ -58,6 +60,7 @@ export async function adminGetOverview(): Promise<{ success: boolean; stats?: Ad
       count('vendor_applications', { status: 'pending_review' }),
       count('orders', { status: 'Active' }),
       count('orders', { status: 'Completed' }),
+      count('support_tickets', { status: 'open' }),
     ]);
 
     return {
@@ -73,6 +76,7 @@ export async function adminGetOverview(): Promise<{ success: boolean; stats?: Ad
         pendingVendorApplications,
         activeOrders,
         completedOrders,
+        openSupportTickets,
       },
     };
   } catch (error: any) {

@@ -5,11 +5,13 @@ import { motion } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera, Loader2, Save, MessageSquare, Send } from 'lucide-react';
+import { Edit3, TrendingDown, ShoppingBag, UserCheck, LogOut, Camera, Loader2, Save, Headphones, MessageSquare } from 'lucide-react';
 import { useUser } from '@/providers/UserProvider';
 import { useOrders } from '@/hooks/useOrders';
 import { supabase } from '@/lib/supabase/client';
 import Price from '@/components/ui/Price';
+import ContactSupportModal from '@/components/support/ContactSupportModal';
+import type { SupportTicketCategory } from '@/types/support';
 
 export default function StudentProfile() {
   const router = useRouter();
@@ -24,10 +26,10 @@ export default function StudentProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  const [isContactOpen, setIsContactOpen] = useState(false);
-  const [contactMessage, setContactMessage] = useState('');
-  const [isSendingSupport, setIsSendingSupport] = useState(false);
-  const [supportStatus, setSupportStatus] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  // Support modal state
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [supportCategory, setSupportCategory] = useState<SupportTicketCategory>('general');
+  const [supportSubject, setSupportSubject] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -43,6 +45,12 @@ export default function StudentProfile() {
   const handleLogout = () => {
     logout();
     router.push('/student/sign-in');
+  };
+
+  const openSupportModal = (category: SupportTicketCategory = 'general', subject: string = '') => {
+    setSupportCategory(category);
+    setSupportSubject(subject);
+    setIsSupportModalOpen(true);
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,24 +123,6 @@ export default function StudentProfile() {
       setUser((prev) => prev ? { ...prev, fullName: editName, phone: editPhone } : prev);
       setSaveMessage({ text: 'Profile updated successfully.', type: 'success' });
     }
-  };
-
-  const handleSupportSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contactMessage.trim()) return;
-    setIsSendingSupport(true);
-    setSupportStatus(null);
-    
-    // Simulate sending support request
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    setIsSendingSupport(false);
-    setSupportStatus({ text: 'Your message has been sent to our support team.', type: 'success' });
-    setContactMessage('');
-    setTimeout(() => {
-        setIsContactOpen(false);
-        setSupportStatus(null);
-    }, 3000);
   };
 
   return (
@@ -231,7 +221,7 @@ export default function StudentProfile() {
               To change your university, proof of enrollment is required.{' '}
               <button 
                 type="button" 
-                onClick={() => setIsContactOpen(!isContactOpen)}
+                onClick={() => openSupportModal('account_verification', 'University change request')}
                 className="text-[#FF6B00] font-semibold hover:underline"
               >
                 Contact support.
@@ -242,7 +232,7 @@ export default function StudentProfile() {
           <button
             type="submit"
             disabled={isSaving || (editName === user.fullName && editPhone === user.phone)}
-            className="h-11 px-6 bg-[#FF6B00] disabled:bg-orange-300 text-white rounded-lg font-bold hover:bg-[#e66000] flex items-center gap-2 mt-2 transition-colors"
+            className="h-11 px-6 bg-[#FF6B00] disabled:bg-orange-300 text-white rounded-lg font-bold hover:bg-[#e66000] flex items-center gap-2 mt-2 transition-colors cursor-pointer"
           >
             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Changes
@@ -250,52 +240,30 @@ export default function StudentProfile() {
         </form>
       </section>
 
-      {isContactOpen && (
-        <motion.section 
-          initial={{ opacity: 0, y: -10 }} 
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-[#FFF8F6] border border-[#FF6B00]/20 rounded-xl p-5 shadow-sm space-y-4"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="w-5 h-5 text-[#FF6B00]" />
-            <h3 className="font-display font-bold text-[#111827]">Contact Support</h3>
+      {/* Support & Assistance Card */}
+      <section className="bg-gradient-to-br from-[#FFF8F6] to-white border border-[#FF6B00]/20 rounded-2xl p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#FF6B00]/10 flex items-center justify-center text-[#FF6B00] shrink-0">
+            <Headphones className="w-6 h-6" />
           </div>
-          
-          {supportStatus ? (
-            <div className={`p-3 rounded-lg text-sm font-semibold border ${supportStatus.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-              {supportStatus.text}
-            </div>
-          ) : (
-            <form onSubmit={handleSupportSubmit} className="space-y-3">
-              <textarea
-                required
-                value={contactMessage}
-                onChange={(e) => setContactMessage(e.target.value)}
-                placeholder="How can we help you?"
-                rows={4}
-                className="w-full p-3 rounded-lg border border-[#E2E8F0] focus:ring-2 focus:ring-[#FF6B00] outline-none text-sm resize-none"
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsContactOpen(false)}
-                  className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSendingSupport}
-                  className="px-4 py-2 bg-[#FF6B00] text-white rounded-lg text-sm font-bold hover:bg-[#e66000] flex items-center gap-2 transition-colors disabled:opacity-70"
-                >
-                  {isSendingSupport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Send Message
-                </button>
-              </div>
-            </form>
-          )}
-        </motion.section>
-      )}
+          <div>
+            <h3 className="font-display font-extrabold text-base text-[#111827]">
+              Need Help or Have a Query?
+            </h3>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed max-w-sm">
+              Reach out to our support team for order assistance, payment verification, or account questions.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => openSupportModal('general', '')}
+          className="h-10 px-5 bg-[#FF6B00] hover:bg-[#e66000] text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm shadow-[#FF6B00]/20 transition-all shrink-0 active:scale-95 cursor-pointer"
+        >
+          <MessageSquare className="w-4 h-4" />
+          <span>Contact Support</span>
+        </button>
+      </section>
 
       <section className="space-y-4">
         <h3 className="font-display font-extrabold text-lg text-[#111827] ml-1">Past Transactions</h3>
@@ -331,10 +299,22 @@ export default function StudentProfile() {
         </div>
       </section>
 
-      <button onClick={handleLogout} className="w-full h-12 bg-gray-100 hover:bg-gray-200 text-[#5a4136] font-bold rounded-lg flex items-center justify-center gap-2 mt-4 active:scale-95 transition-all text-xs">
+      <button onClick={handleLogout} className="w-full h-12 bg-gray-100 hover:bg-gray-200 text-[#5a4136] font-bold rounded-lg flex items-center justify-center gap-2 mt-4 active:scale-95 transition-all text-xs cursor-pointer">
         <LogOut className="w-4 h-4 text-[#E11D48]" />
         <span>Log Out of Student Account</span>
       </button>
+
+      {/* Support Modal */}
+      <ContactSupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        userRole="student"
+        userName={user.fullName}
+        userEmail={user.email}
+        defaultCategory={supportCategory}
+        defaultSubject={supportSubject}
+      />
     </motion.div>
   );
 }
+

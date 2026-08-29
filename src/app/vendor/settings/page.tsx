@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'motion/react';
 import Image from 'next/image';
-import { Building2, Camera, Loader2, LogOut, Lock, Save, Store } from 'lucide-react';
+import { Building2, Camera, Headphones, Loader2, LogOut, Lock, MessageSquare, Save, Store } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import VendorTopBar from '@/components/layout/VendorTopBar';
+import ContactSupportModal from '@/components/support/ContactSupportModal';
+import type { SupportTicketCategory } from '@/types/support';
 
 interface VendorProfileForm {
   business_name: string;
@@ -41,6 +43,11 @@ export default function VendorSettings() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Support modal state
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [supportCategory, setSupportCategory] = useState<SupportTicketCategory>('general');
+  const [supportSubject, setSupportSubject] = useState('');
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
@@ -58,6 +65,12 @@ export default function VendorSettings() {
         });
     });
   }, []);
+
+  const openSupportModal = (category: SupportTicketCategory = 'general', subject: string = '') => {
+    setSupportCategory(category);
+    setSupportSubject(subject);
+    setIsSupportModalOpen(true);
+  };
 
   const updateField = (key: keyof VendorProfileForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -284,17 +297,49 @@ export default function VendorSettings() {
                 value={form.email}
                 className="w-full h-11 px-4 rounded-lg border border-[#E2E8F0] bg-gray-50 text-sm text-gray-400 cursor-not-allowed"
               />
-              <p className="text-xs text-gray-400 mt-1.5">Contact support to change your login email.</p>
+              <p className="text-xs text-gray-400 mt-1.5">
+                To update your business email,{' '}
+                <button
+                  type="button"
+                  onClick={() => openSupportModal('account_verification', 'Request to change vendor login email')}
+                  className="text-[#FF6B00] font-semibold hover:underline cursor-pointer"
+                >
+                  contact support.
+                </button>
+              </p>
             </div>
             <button
               type="submit"
               disabled={isSaving}
-              className="h-11 px-6 bg-[#FF6B00] disabled:bg-orange-300 text-white rounded-lg font-bold hover:bg-[#e66000] flex items-center gap-2"
+              className="h-11 px-6 bg-[#FF6B00] disabled:bg-orange-300 text-white rounded-lg font-bold hover:bg-[#e66000] flex items-center gap-2 cursor-pointer"
             >
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Save Changes
             </button>
           </form>
+        </section>
+
+        {/* Support & Assistance Card */}
+        <section className="bg-gradient-to-br from-gray-900 to-slate-900 rounded-xl shadow-sm p-6 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center text-[#FF6B00] shrink-0 border border-white/10">
+              <Headphones className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="font-bold text-base text-white leading-tight">Vendor Support & Help Desk</h2>
+              <p className="text-xs text-gray-300 mt-1 leading-relaxed max-w-md">
+                Have questions about your listings, customer pickups, or financial payouts? We&apos;re here to assist.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => openSupportModal('general', '')}
+            className="h-10 px-5 bg-[#FF6B00] hover:bg-[#e66000] text-white text-xs font-bold rounded-lg flex items-center gap-2 shadow-sm shadow-[#FF6B00]/20 transition-all shrink-0 active:scale-95 cursor-pointer"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Contact Support</span>
+          </button>
         </section>
 
         <section className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 space-y-5">
@@ -332,7 +377,7 @@ export default function VendorSettings() {
             <button
               type="submit"
               disabled={isChangingPassword}
-              className="h-11 px-5 bg-[#1E293B] disabled:opacity-60 text-white rounded-lg font-bold hover:bg-[#334155] shrink-0"
+              className="h-11 px-5 bg-[#1E293B] disabled:opacity-60 text-white rounded-lg font-bold hover:bg-[#334155] shrink-0 cursor-pointer"
             >
               {isChangingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
             </button>
@@ -341,12 +386,24 @@ export default function VendorSettings() {
 
         <button
           onClick={handleSignOut}
-          className="w-full h-12 bg-gray-100 hover:bg-gray-200 text-[#5a4136] font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all text-sm"
+          className="w-full h-12 bg-gray-100 hover:bg-gray-200 text-[#5a4136] font-bold rounded-lg flex items-center justify-center gap-2 active:scale-95 transition-all text-sm cursor-pointer"
         >
           <LogOut className="w-4 h-4 text-[#E11D48]" />
           <span>Sign Out</span>
         </button>
       </div>
+
+      {/* Support Modal */}
+      <ContactSupportModal
+        isOpen={isSupportModalOpen}
+        onClose={() => setIsSupportModalOpen(false)}
+        userRole="vendor"
+        userName={form.business_name || form.contact_name}
+        userEmail={form.email}
+        defaultCategory={supportCategory}
+        defaultSubject={supportSubject}
+      />
     </motion.div>
   );
 }
+

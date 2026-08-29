@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import OrderClient from "./OrderClient";
 import type { Deal, Order } from "@/types";
 
-export default async function OrderPage({ params }: { params: { id: string } }) {
+export default async function OrderPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+    const resolvedParams = await params;
     const supabase = await createClient();
 
     const {
@@ -20,31 +21,31 @@ export default async function OrderPage({ params }: { params: { id: string } }) 
             *,
             deal:deals(*)
         `)
-        .eq('id', params.id)
+        .eq('id', resolvedParams.id)
         .eq('user_id', session.user.id)
         .single();
 
-    if (error || !o || !o.deal) {
+    if (error || !o) {
         redirect("/student/orders");
     }
 
-    const deal = o.deal as Record<string, unknown>;
+    const deal = o.deal as Record<string, unknown> | null;
     const order: Order = {
         id: String(o.id),
         deal: {
-            id: String(deal.id),
-            title: String(deal.title),
-            vendor: String(deal.vendor),
-            campus: String(deal.campus),
-            originalPrice: Number(deal.original_price),
-            dealPrice: Number(deal.deal_price),
-            image: String(deal.image),
-            discountPercentage: Number(deal.discount_percentage),
-            timeStart: String(deal.time_start),
-            timeEnd: String(deal.time_end),
-            category: String(deal.category),
-            stockCount: Number(deal.stock_count),
-            expiresAt: String(deal.expires_at),
+            id: deal ? String(deal.id) : String(o.deal_id || 'deleted-deal'),
+            title: deal ? String(deal.title) : String(o.deal_title || 'Unavailable Deal'),
+            vendor: deal ? String(deal.vendor) : String(o.deal_vendor || 'Unknown Vendor'),
+            campus: deal ? String(deal.campus) : 'Unknown Campus',
+            originalPrice: deal ? Number(deal.original_price) : Number(o.deal_original_price || o.total_paid),
+            dealPrice: deal ? Number(deal.deal_price) : Number(o.deal_price || o.total_paid),
+            image: deal ? String(deal.image) : String(o.deal_image || '/images/dealplatehero.webp'),
+            discountPercentage: deal ? Number(deal.discount_percentage) : 0,
+            timeStart: deal ? String(deal.time_start) : '--:--',
+            timeEnd: deal ? String(deal.time_end) : '--:--',
+            category: deal ? String(deal.category) : 'Other',
+            stockCount: deal ? Number(deal.stock_count) : 0,
+            expiresAt: deal ? String(deal.expires_at) : new Date().toISOString(),
         } as Deal,
         date: String(o.order_date),
         time: String(o.order_time),

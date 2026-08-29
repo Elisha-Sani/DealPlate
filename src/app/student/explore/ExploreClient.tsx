@@ -92,8 +92,8 @@ export default function ExploreClient({
           </p>
         </div>
         <div className="text-white bg-black/15 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 shrink-0 text-center">
-          <span className="block text-xs uppercase tracking-wider opacity-85">Daily Saved Amount</span>
-          <Price amount={pastOrders.filter(o => o.status === 'Completed').reduce((sum, o) => sum + (o.deal.originalPrice - o.deal.dealPrice), 0)} size="lg" className="text-white font-black" />
+          <span className="block text-xs uppercase tracking-wider opacity-85">Total Saved</span>
+          <Price amount={user?.totalSaved ?? pastOrders.filter(o => o.status === 'Completed').reduce((sum, o) => sum + (o.deal.originalPrice - o.deal.dealPrice), 0)} size="lg" className="text-white font-black" />
         </div>
       </div>
 

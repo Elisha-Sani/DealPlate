@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Eye,
   EyeOff,
+  Headphones,
   Loader2,
   Package,
   ScrollText,
@@ -20,25 +21,29 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { reviewVendorApplicationSecure } from '@/app/actions/reviewVendorApplication';
+import { adminUpdateSupportTicket } from '@/app/actions/adminUpdateSupportTicket';
 import type { AdminOverviewStats } from '@/app/actions/adminGetOverview';
 import type { AdminDealRow } from '@/app/actions/adminGetDeals';
 import type { AdminActionRow } from '@/app/actions/adminGetAuditLog';
+import type { SupportTicket, SupportTicketStatus } from '@/types/support';
 
 import { OverviewTab } from './components/OverviewTab';
 import { StudentKycTab } from './components/StudentKycTab';
 import { VendorsTab } from './components/VendorsTab';
 import { DealsTab } from './components/DealsTab';
+import { SupportTicketsTab } from './components/SupportTicketsTab';
 import { AuditLogTab } from './components/AuditLogTab';
 import { SettingsTab } from './components/SettingsTab';
 import type { StudentKycApplication, VendorApplication } from './types';
 
-type Tab = 'overview' | 'students' | 'vendors' | 'deals' | 'audit' | 'settings';
+type Tab = 'overview' | 'students' | 'vendors' | 'deals' | 'support' | 'audit' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: 'overview', label: 'Overview', icon: ClipboardCheck },
   { id: 'students', label: 'Student KYC', icon: UserCheck },
   { id: 'vendors', label: 'Vendors', icon: Store },
   { id: 'deals', label: 'Deals', icon: Package },
+  { id: 'support', label: 'Support', icon: Headphones },
   { id: 'audit', label: 'Audit Log', icon: ScrollText },
   { id: 'settings', label: 'Settings', icon: ShieldCheck },
 ];
@@ -50,6 +55,7 @@ export default function SuperadminClient({
   initialVendorApps,
   initialDeals,
   initialAuditLog,
+  initialSupportTickets = [],
   initialOverviewStats,
   isUnlocked,
   hasSession,
@@ -58,6 +64,7 @@ export default function SuperadminClient({
   initialVendorApps: VendorApplication[];
   initialDeals: AdminDealRow[];
   initialAuditLog: AdminActionRow[];
+  initialSupportTickets?: SupportTicket[];
   initialOverviewStats: AdminOverviewStats;
   isUnlocked: boolean;
   hasSession: boolean;
@@ -76,6 +83,7 @@ export default function SuperadminClient({
   const [vendorApps, setVendorApps] = useState<VendorApplication[]>(initialVendorApps);
   const [deals, setDeals] = useState<AdminDealRow[]>(initialDeals);
   const [auditLog, setAuditLog] = useState<AdminActionRow[]>(initialAuditLog);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [overviewStats, setOverviewStats] = useState<AdminOverviewStats | null>(initialOverviewStats);
 
   const [studentSearch, setStudentSearch] = useState('');
@@ -84,6 +92,11 @@ export default function SuperadminClient({
   const [vendorStatusFilter, setVendorStatusFilter] = useState('all');
   const [dealSearch, setDealSearch] = useState('');
   const [dealStatusFilter, setDealStatusFilter] = useState('all');
+
+  const [supportSearch, setSupportSearch] = useState('');
+  const [supportProfileFilter, setSupportProfileFilter] = useState<'all' | 'student' | 'vendor'>('all');
+  const [supportStatusFilter, setSupportStatusFilter] = useState('all');
+  const [isUpdatingSupport, setIsUpdatingSupport] = useState(false);
 
   const [modalConfig, setModalConfig] = useState<{
     title: string;
@@ -100,8 +113,9 @@ export default function SuperadminClient({
     setVendorApps(initialVendorApps);
     setDeals(initialDeals);
     setAuditLog(initialAuditLog);
+    setSupportTickets(initialSupportTickets);
     setOverviewStats(initialOverviewStats);
-  }, [initialStudentApps, initialVendorApps, initialDeals, initialAuditLog, initialOverviewStats]);
+  }, [initialStudentApps, initialVendorApps, initialDeals, initialAuditLog, initialSupportTickets, initialOverviewStats]);
 
   const loadAll = async () => {
     router.refresh();
@@ -320,6 +334,42 @@ export default function SuperadminClient({
     });
   }, [deals, dealSearch, dealStatusFilter]);
 
+  const handleUpdateSupportTicket = async (
+    ticketId: string,
+    status: SupportTicketStatus,
+    adminNotes?: string
+  ) => {
+    setIsUpdatingSupport(true);
+    try {
+      const res = await adminUpdateSupportTicket({ ticketId, status, adminNotes });
+      if (!res.success) {
+        setStatusMessage(res.error || 'Failed to update support ticket.', 'error');
+        return;
+      }
+      setSupportTickets((prev) =>
+        prev.map((t) =>
+          t.id === ticketId
+            ? {
+                ...t,
+                status,
+                admin_notes: adminNotes !== undefined ? adminNotes : t.admin_notes,
+                resolved_at: status === 'resolved' || status === 'closed' ? new Date().toISOString() : null,
+              }
+            : t
+        )
+      );
+      setStatusMessage('Support ticket updated successfully.', 'success');
+    } catch (err: any) {
+      setStatusMessage(err?.message || 'Error updating support ticket.', 'error');
+    } finally {
+      setIsUpdatingSupport(false);
+    }
+  };
+
+  const openSupportCount = useMemo(() => {
+    return supportTickets.filter((t) => t.status === 'open').length;
+  }, [supportTickets]);
+
   if (!isUnlocked) {
     return (
       <main className="min-h-screen bg-[#F9FAFB] flex flex-col items-center justify-center p-4">
@@ -402,12 +452,19 @@ export default function SuperadminClient({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`h-10 px-3 md:px-4 rounded-lg text-sm font-bold flex items-center justify-center md:justify-start gap-2.5 whitespace-nowrap transition-colors ${
+                className={`h-10 px-3 md:px-4 rounded-lg text-sm font-bold flex items-center justify-between md:justify-start gap-2.5 whitespace-nowrap transition-colors cursor-pointer ${
                   activeTab === tab.id ? 'bg-[#1E293B] text-white shadow-sm' : 'text-gray-500 hover:text-[#1E293B] hover:bg-gray-50'
                 }`}
               >
-                <tab.icon className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
-                {tab.label}
+                <div className="flex items-center gap-2.5">
+                  <tab.icon className="w-4 h-4 md:w-5 md:h-5 shrink-0" />
+                  {tab.label}
+                </div>
+                {tab.id === 'support' && openSupportCount > 0 && (
+                  <span className="ml-auto px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-500 text-white">
+                    {openSupportCount}
+                  </span>
+                )}
               </button>
             ))}
             {activeTab === 'settings' && (
@@ -450,6 +507,19 @@ export default function SuperadminClient({
                 setDealStatusFilter={setDealStatusFilter}
                 handleToggleDealPublished={handleToggleDealPublished}
                 handleDeleteDeal={handleDeleteDeal}
+              />
+            )}
+            {activeTab === 'support' && (
+              <SupportTicketsTab
+                tickets={supportTickets}
+                searchQuery={supportSearch}
+                setSearchQuery={setSupportSearch}
+                profileFilter={supportProfileFilter}
+                setProfileFilter={setSupportProfileFilter}
+                statusFilter={supportStatusFilter}
+                setStatusFilter={setSupportStatusFilter}
+                onUpdateTicket={handleUpdateSupportTicket}
+                isUpdating={isUpdatingSupport}
               />
             )}
             {activeTab === 'audit' && <AuditLogTab auditLog={auditLog} />}

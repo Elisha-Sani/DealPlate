@@ -17,28 +17,31 @@ export default async function SuperadminPage() {
                 initialVendorApps={[]}
                 initialDeals={[]}
                 initialAuditLog={[]}
-                initialOverviewStats={{ totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0 }}
+                initialSupportTickets={[]}
+                initialOverviewStats={{ totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0, openSupportTickets: 0 }}
                 isUnlocked={isSuperadmin}
                 hasSession={!!session}
             />
         );
     }
 
-    const [{ data: students }, { data: vendors }, overview, dealsResult, auditResult] = await Promise.all([
+    const [{ data: students }, { data: vendors }, overview, dealsResult, auditResult, supportResult] = await Promise.all([
         supabase.from('student_kyc_applications').select('*').order('created_at', { ascending: false }),
         supabase.from('vendor_applications').select('*').order('created_at', { ascending: false }),
         import('@/app/actions/adminGetOverview').then((m) => m.adminGetOverview()),
         import('@/app/actions/adminGetDeals').then((m) => m.adminGetDeals()),
         import('@/app/actions/adminGetAuditLog').then((m) => m.adminGetAuditLog()),
+        import('@/app/actions/adminGetSupportTickets').then((m) => m.adminGetSupportTickets()),
     ]);
 
     return (
         <SuperadminClient
             initialStudentApps={students || []}
             initialVendorApps={vendors || []}
-            initialOverviewStats={overview.success ? overview.stats! : { totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0 }}
+            initialOverviewStats={overview.success ? overview.stats! : { totalStudents: 0, verifiedStudents: 0, revokedStudents: 0, pendingKycReviews: 0, totalVendors: 0, approvedVendors: 0, revokedVendors: 0, pendingVendorApplications: 0, activeOrders: 0, completedOrders: 0, openSupportTickets: 0 }}
             initialDeals={dealsResult.success ? dealsResult.deals! : []}
             initialAuditLog={auditResult.success ? auditResult.actions! : []}
+            initialSupportTickets={supportResult.success ? supportResult.tickets! : []}
             isUnlocked={true}
             hasSession={!!session}
         />
