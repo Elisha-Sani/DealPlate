@@ -95,61 +95,65 @@ export default function LandingPage() {
                     </motion.div>
 
                     <div className="flex flex-col gap-5">
-                        <Link href="/student/explore" passHref legacyBehavior>
-                            <motion.a
-                                variants={itemVariants}
-                                whileHover={{ scale: 1.02, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
+                        <motion.div
+                            variants={itemVariants}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <Link
+                                href="/student/explore"
                                 className="group relative flex items-center w-full p-6 bg-white border-2 border-gray-100 hover:border-[#FF6B00]/30 rounded-3xl transition-all shadow-sm hover:shadow-xl hover:shadow-[#FF6B00]/10 overflow-hidden cursor-pointer"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-orange-50 to-rose-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                             
-                            <div className="relative flex items-center w-full">
-                                <div className="w-14 h-14 bg-orange-50 text-[#FF6B00] rounded-2xl flex items-center justify-center mr-5 group-hover:scale-110 group-hover:bg-[#FF6B00] group-hover:text-white transition-all duration-300 shadow-sm">
-                                    <Utensils className="w-6 h-6" />
+                                <div className="relative flex items-center w-full">
+                                    <div className="w-14 h-14 bg-orange-50 text-[#FF6B00] rounded-2xl flex items-center justify-center mr-5 group-hover:scale-110 group-hover:bg-[#FF6B00] group-hover:text-white transition-all duration-300 shadow-sm">
+                                        <Utensils className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                            I am a Student
+                                        </h3>
+                                        <p className="text-sm text-gray-500 font-medium group-hover:text-gray-700 transition-colors">
+                                            Discover and buy discounted meals
+                                        </p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shadow-sm">
+                                        <ArrowRight className="w-4 h-4 text-[#FF6B00]" />
+                                    </div>
                                 </div>
-                                <div className="text-left flex-1">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                                        I am a Student
-                                    </h3>
-                                    <p className="text-sm text-gray-500 font-medium group-hover:text-gray-700 transition-colors">
-                                        Discover and buy discounted meals
-                                    </p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shadow-sm">
-                                    <ArrowRight className="w-4 h-4 text-[#FF6B00]" />
-                                </div>
-                            </div>
-                            </motion.a>
-                        </Link>
+                            </Link>
+                        </motion.div>
 
-                        <Link href="/vendor/sign-in" passHref legacyBehavior>
-                            <motion.a
-                                variants={itemVariants}
-                                whileHover={{ scale: 1.02, y: -2 }}
-                                whileTap={{ scale: 0.98 }}
+                        <motion.div
+                            variants={itemVariants}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                        >
+                            <Link
+                                href="/vendor/sign-in"
                                 className="group relative flex items-center w-full p-6 bg-white border-2 border-gray-100 hover:border-gray-900/30 rounded-3xl transition-all shadow-sm hover:shadow-xl hover:shadow-gray-900/10 overflow-hidden cursor-pointer"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-gray-50 to-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-                            <div className="relative flex items-center w-full">
-                                <div className="w-14 h-14 bg-gray-50 text-gray-900 rounded-2xl flex items-center justify-center mr-5 group-hover:scale-110 group-hover:bg-gray-900 group-hover:text-white transition-all duration-300 shadow-sm">
-                                    <Store className="w-6 h-6" />
+                                <div className="relative flex items-center w-full">
+                                    <div className="w-14 h-14 bg-gray-50 text-gray-900 rounded-2xl flex items-center justify-center mr-5 group-hover:scale-110 group-hover:bg-gray-900 group-hover:text-white transition-all duration-300 shadow-sm">
+                                        <Store className="w-6 h-6" />
+                                    </div>
+                                    <div className="text-left flex-1">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                            I am a Vendor
+                                        </h3>
+                                        <p className="text-sm text-gray-500 font-medium group-hover:text-gray-700 transition-colors">
+                                            List surplus food & increase revenue
+                                        </p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shadow-sm">
+                                        <ArrowRight className="w-4 h-4 text-gray-900" />
+                                    </div>
                                 </div>
-                                <div className="text-left flex-1">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">
-                                        I am a Vendor
-                                    </h3>
-                                    <p className="text-sm text-gray-500 font-medium group-hover:text-gray-700 transition-colors">
-                                        List surplus food & increase revenue
-                                    </p>
-                                </div>
-                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 shadow-sm">
-                                    <ArrowRight className="w-4 h-4 text-gray-900" />
-                                </div>
-                            </div>
-                            </motion.a>
-                        </Link>
+                            </Link>
+                        </motion.div>
                     </div>
                 </motion.div>
             </div>
